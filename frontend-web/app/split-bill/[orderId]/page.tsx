@@ -54,7 +54,6 @@ export default function SplitBillPage() {
   const [splitBill, setSplitBill] = useState<SplitBill | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
-  const [showLinks, setShowLinks] = useState(false);
 
   useEffect(() => {
     fetchOrderData();
@@ -74,7 +73,7 @@ export default function SplitBillPage() {
         setSplitBill(existingSplit);
         setSplitMethod(existingSplit.method);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching order:', error);
       toast.error('Erro ao carregar dados do pedido');
     } finally {
@@ -97,10 +96,10 @@ export default function SplitBillPage() {
 
       setSplitBill(response.data.data);
       toast.success('Divisão de conta criada com sucesso!');
-      setShowLinks(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating split:', error);
-      toast.error(error.response?.data?.message || 'Erro ao criar divisão de conta');
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || 'Erro ao criar divisão de conta');
     } finally {
       setIsCreating(false);
     }
@@ -240,8 +239,10 @@ export default function SplitBillPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {splitBill.paymentLinks.map((link) => {
-                      const participant = splitBill.participants.find(p => p.userId === link.userId);
+                    {Array.isArray(splitBill.paymentLinks) && splitBill.paymentLinks.map((link) => {
+                      const participant = Array.isArray(splitBill.participants)
+                        ? splitBill.participants.find(p => p.userId === link.userId)
+                        : null;
                       return (
                         <div
                           key={link.id}
