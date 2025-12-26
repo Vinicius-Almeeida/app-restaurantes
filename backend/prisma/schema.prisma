@@ -1,0 +1,537 @@
+// TabSync - Prisma Schema
+// Restaurant ordering and payment management system
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USERS
+// ============================================
+enum UserRole {
+  CUSTOMER
+  RESTAURANT_OWNER
+  ADMIN
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  fullName      String   @map("full_name")
+  phone         String?
+  role          UserRole @default(CUSTOMER)
+  avatarUrl     String?  @map("avatar_url")
+  emailVerified Boolean  @default(false) @map("email_verified")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  ownedRestaurants   Restaurant[]
+  orderParticipations OrderParticipant[]
+  orderItems         OrderItem[]
+  splitPayments      SplitPayment[]
+  analyticsEvents    AnalyticsEvent[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+// ============================================
+// RESTAURANTS
+// ============================================
+model Restaurant {
+  id              String   @id @default(uuid())
+  ownerId         String   @map("owner_id")
+  name            String
+  slug            String   @unique
+  description     String?  @db.Text
+  logoUrl         String?  @map("logo_url")
+  coverUrl        String?  @map("cover_url")
+
+  // Address
+  addressStreet   String?  @map("address_street")
+  addressCity     String?  @map("address_city")
+  addressState    String?  @map("address_state")
+  addressZip      String?  @map("address_zip")
+  addressCountry  String   @default("Brasil") @map("address_country")
+
+  // Contact
+  phone           String?
+  email           String?
+
+  // Settings
+  isActive        Boolean  @default(true) @map("is_active")
+  acceptsOrders   Boolean  @default(true) @map("accepts_orders")
+  currency        String   @default("BRL")
+  operatingHours  Json?    @map("operating_hours")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  owner           User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  menuCategories  MenuCategory[]
+  menuItems       MenuItem[]
+  orders          Order[]
+  analyticsEvents AnalyticsEvent[]
+  suppliers       Supplier[]
+  inventoryItems  InventoryItem[]
+  invoiceUploads  InvoiceUpload[]
+  stockEntries    StockEntry[]
+
+  @@index([ownerId])
+  @@index([slug])
+  @@index([isActive])
+  @@map("restaurants")
+}
+
+// ============================================
+// MENU
+// ============================================
+model MenuCategory {
+  id           String   @id @default(uuid())
+  restaurantId String   @map("restaurant_id")
+  name         String
+  description  String?  @db.Text
+  displayOrder Int      @default(0) @map("display_order")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItems  MenuItem[]
+
+  @@index([restaurantId])
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id             String   @id @default(uuid())
+  restaurantId   String   @map("restaurant_id")
+  categoryId     String?  @map("category_id")
+  name           String
+  description    String?  @db.Text
+  imageUrl       String?  @map("image_url")
+  price          Decimal  @db.Decimal(10, 2)
+
+  // Nutritional info
+  calories       Int?
+  allergens      String[]
+
+  // Availability
+  isAvailable    Boolean  @default(true) @map("is_available")
+  stockQuantity  Int?     @map("stock_quantity")
+
+  // Customizations
+  customizations Json?
+
+  displayOrder   Int      @default(0) @map("display_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant     Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category       MenuCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  orderItems     OrderItem[]
+  inventoryLinks MenuItemInventory[]
+
+  @@index([restaurantId])
+  @@index([categoryId])
+  @@index([isAvailable])
+  @@map("menu_items")
+}
+
+// ============================================
+// ORDERS
+// ============================================
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+model Order {
+  id              String      @id @default(uuid())
+  restaurantId    String      @map("restaurant_id")
+  orderNumber     String      @unique @map("order_number")
+  tableNumber     String?     @map("table_number")
+  status          OrderStatus @default(PENDING)
+
+  // Financial
+  subtotal        Decimal     @db.Decimal(10, 2)
+  taxAmount       Decimal     @default(0) @db.Decimal(10, 2) @map("tax_amount")
+  discountAmount  Decimal     @default(0) @db.Decimal(10, 2) @map("discount_amount")
+  totalAmount     Decimal     @db.Decimal(10, 2) @map("total_amount")
+
+  // Split bill feature 🔥
+  isSplit         Boolean     @default(false) @map("is_split")
+  splitCount      Int         @default(1) @map("split_count")
+
+  notes           String?     @db.Text
+
+  // Timestamps
+  createdAt       DateTime    @default(now()) @map("created_at")
+  confirmedAt     DateTime?   @map("confirmed_at")
+  completedAt     DateTime?   @map("completed_at")
+  cancelledAt     DateTime?   @map("cancelled_at")
+
+  // Relations
+  restaurant   Restaurant         @relation(fields: [restaurantId], references: [id])
+  orderItems   OrderItem[]
+  participants OrderParticipant[]
+  payments     Payment[]
+  splitPayments SplitPayment[]
+
+  @@index([restaurantId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("orders")
+}
+
+model OrderItem {
+  id             String   @id @default(uuid())
+  orderId        String   @map("order_id")
+  menuItemId     String   @map("menu_item_id")
+  userId         String?  @map("user_id")
+  quantity       Int      @default(1)
+  unitPrice      Decimal  @db.Decimal(10, 2) @map("unit_price")
+  customizations Json?
+  notes          String?  @db.Text
+
+  // Sharing feature 🔥
+  isShared       Boolean  @default(false) @map("is_shared")
+  sharedWith     String[] @map("shared_with")
+
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+  user     User?    @relation(fields: [userId], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+  @@map("order_items")
+}
+
+model OrderParticipant {
+  id         String   @id @default(uuid())
+  orderId    String   @map("order_id")
+  userId     String?  @map("user_id")
+  guestName  String?  @map("guest_name")
+  guestEmail String?  @map("guest_email")
+  role       String   @default("participant")
+  joinedAt   DateTime @default(now()) @map("joined_at")
+
+  // Relations
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+  @@map("order_participants")
+}
+
+// ============================================
+// PAYMENTS 🔥
+// ============================================
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  PIX
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  orderId     String        @map("order_id")
+  method      PaymentMethod @map("payment_method")
+  gateway     String?
+  gatewayId   String?       @map("gateway_id")
+  amount      Decimal       @db.Decimal(10, 2)
+  currency    String        @default("BRL")
+  status      PaymentStatus @default(PENDING)
+  metadata    Json?
+
+  createdAt   DateTime      @default(now()) @map("created_at")
+  processedAt DateTime?     @map("processed_at")
+  completedAt DateTime?     @map("completed_at")
+
+  // Relations
+  order         Order          @relation(fields: [orderId], references: [id])
+  splitPayments SplitPayment[]
+
+  @@index([orderId])
+  @@index([status])
+  @@index([gatewayId])
+  @@map("payments")
+}
+
+// CORE FEATURE: Split Payments 🔥🔥
+enum SplitMethod {
+  EQUAL
+  BY_ITEM
+  CUSTOM
+  PERCENTAGE
+}
+
+enum SplitPaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+model SplitPayment {
+  id            String             @id @default(uuid())
+  orderId       String             @map("order_id")
+  userId        String             @map("user_id")
+  userEmail     String             @map("user_email")
+  userName      String?            @map("user_name")
+  splitMethod   SplitMethod        @map("split_method")
+  amountDue     Decimal            @db.Decimal(10, 2) @map("amount_due")
+  paymentStatus SplitPaymentStatus @default(PENDING) @map("payment_status")
+  paymentId     String?            @map("payment_id")
+  paymentLink   String?            @map("payment_link") @db.Text
+  paymentToken  String?            @unique @map("payment_token")
+
+  createdAt     DateTime           @default(now()) @map("created_at")
+  paidAt        DateTime?          @map("paid_at")
+  expiresAt     DateTime?          @map("expires_at")
+
+  // Relations
+  order   Order    @relation(fields: [orderId], references: [id])
+  user    User     @relation(fields: [userId], references: [id])
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([paymentStatus])
+  @@map("split_payments")
+}
+
+// ============================================
+// ANALYTICS
+// ============================================
+model AnalyticsEvent {
+  id           String   @id @default(uuid())
+  restaurantId String?  @map("restaurant_id")
+  userId       String?  @map("user_id")
+  eventType    String   @map("event_type")
+  eventData    Json?    @map("event_data")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  restaurant Restaurant? @relation(fields: [restaurantId], references: [id])
+  user       User?       @relation(fields: [userId], references: [id])
+
+  @@index([restaurantId])
+  @@index([eventType])
+  @@index([createdAt(sort: Desc)])
+  @@map("analytics_events")
+}
+
+// ============================================
+// INVENTORY & STOCK MANAGEMENT 🔥
+// ============================================
+
+// Supplier/Fornecedor
+model Supplier {
+  id           String   @id @default(uuid())
+  restaurantId String   @map("restaurant_id")
+  name         String
+  cnpj         String?  @unique
+  email        String?
+  phone        String?
+  address      String?  @db.Text
+  notes        String?  @db.Text
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant   Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  stockEntries StockEntry[]
+  invoices     InvoiceUpload[]
+
+  @@index([restaurantId])
+  @@index([isActive])
+  @@map("suppliers")
+}
+
+// Inventory Item (Produto no Estoque)
+model InventoryItem {
+  id                String   @id @default(uuid())
+  restaurantId      String   @map("restaurant_id")
+  name              String
+  description       String?  @db.Text
+  sku               String?  @unique
+  unit              String   @default("UN") // UN, KG, L, etc.
+
+  // Stock
+  currentStock      Decimal  @default(0) @db.Decimal(10, 3) @map("current_stock")
+  minimumStock      Decimal  @default(0) @db.Decimal(10, 3) @map("minimum_stock")
+
+  // Pricing
+  lastPurchasePrice Decimal? @db.Decimal(10, 2) @map("last_purchase_price")
+  averagePrice      Decimal? @db.Decimal(10, 2) @map("average_price")
+
+  // Settings
+  trackStock        Boolean  @default(true) @map("track_stock")
+  isActive          Boolean  @default(true) @map("is_active")
+
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant   Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  stockEntries StockEntryItem[]
+  menuItems    MenuItemInventory[]
+
+  @@index([restaurantId])
+  @@index([isActive])
+  @@index([currentStock])
+  @@map("inventory_items")
+}
+
+// Relação Many-to-Many entre MenuItem e InventoryItem
+model MenuItemInventory {
+  id              String   @id @default(uuid())
+  menuItemId      String   @map("menu_item_id")
+  inventoryItemId String   @map("inventory_item_id")
+  quantity        Decimal  @db.Decimal(10, 3) // Quantidade usada do estoque por item do menu
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relations
+  menuItem      MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, inventoryItemId])
+  @@index([menuItemId])
+  @@index([inventoryItemId])
+  @@map("menu_item_inventory")
+}
+
+// Invoice Upload (Nota Fiscal Upload)
+enum InvoiceStatus {
+  UPLOADED
+  PROCESSING
+  PROCESSED
+  ERROR
+  CANCELLED
+}
+
+model InvoiceUpload {
+  id            String        @id @default(uuid())
+  restaurantId  String        @map("restaurant_id")
+  supplierId    String?       @map("supplier_id")
+
+  // File info
+  fileName      String        @map("file_name")
+  fileUrl       String        @map("file_url") @db.Text
+  fileType      String        @map("file_type") // jpeg, png, pdf
+  fileSize      Int           @map("file_size")
+
+  // Invoice data
+  invoiceNumber String?       @map("invoice_number")
+  invoiceDate   DateTime?     @map("invoice_date")
+  totalAmount   Decimal?      @db.Decimal(10, 2) @map("total_amount")
+
+  // OCR/Processing
+  status        InvoiceStatus @default(UPLOADED)
+  ocrData       Json?         @map("ocr_data")
+  extractedData Json?         @map("extracted_data")
+  errorMessage  String?       @db.Text @map("error_message")
+
+  // Confirmation
+  isConfirmed   Boolean       @default(false) @map("is_confirmed")
+  confirmedAt   DateTime?     @map("confirmed_at")
+
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  supplier     Supplier?    @relation(fields: [supplierId], references: [id])
+  stockEntry   StockEntry?
+
+  @@index([restaurantId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("invoice_uploads")
+}
+
+// Stock Entry (Entrada de Estoque)
+enum StockEntryType {
+  PURCHASE      // Compra
+  ADJUSTMENT    // Ajuste
+  RETURN        // Devolução
+  LOSS          // Perda/Quebra
+  TRANSFER      // Transferência
+}
+
+model StockEntry {
+  id             String         @id @default(uuid())
+  restaurantId   String         @map("restaurant_id")
+  supplierId     String?        @map("supplier_id")
+  invoiceId      String?        @unique @map("invoice_id")
+
+  type           StockEntryType @default(PURCHASE)
+  referenceNumber String?       @map("reference_number")
+  notes          String?        @db.Text
+  totalAmount    Decimal?       @db.Decimal(10, 2) @map("total_amount")
+
+  createdAt      DateTime       @default(now()) @map("created_at")
+  createdBy      String?        @map("created_by")
+
+  // Relations
+  restaurant Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  supplier   Supplier?        @relation(fields: [supplierId], references: [id])
+  invoice    InvoiceUpload?   @relation(fields: [invoiceId], references: [id])
+  items      StockEntryItem[]
+
+  @@index([restaurantId])
+  @@index([type])
+  @@index([createdAt(sort: Desc)])
+  @@map("stock_entries")
+}
+
+// Stock Entry Item (Itens da Entrada)
+model StockEntryItem {
+  id              String   @id @default(uuid())
+  stockEntryId    String   @map("stock_entry_id")
+  inventoryItemId String   @map("inventory_item_id")
+
+  quantity        Decimal  @db.Decimal(10, 3)
+  unitPrice       Decimal  @db.Decimal(10, 2) @map("unit_price")
+  totalPrice      Decimal  @db.Decimal(10, 2) @map("total_price")
+
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relations
+  stockEntry    StockEntry    @relation(fields: [stockEntryId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([stockEntryId])
+  @@index([inventoryItemId])
+  @@map("stock_entry_items")
+}
