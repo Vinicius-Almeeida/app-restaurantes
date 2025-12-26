@@ -23,7 +23,6 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
-  const user = useAuthStore((state) => state.user);
   const [isLoading, setIsLoading] = useState(false);
 
   const {
@@ -32,6 +31,7 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    mode: 'onSubmit',
   });
 
   const onSubmit = async (data: LoginFormData) => {

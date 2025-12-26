@@ -43,6 +43,7 @@ export default function RegisterPage() {
     setValue,
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
+    mode: 'onSubmit',
     defaultValues: {
       role: 'CUSTOMER',
     },
@@ -84,7 +85,7 @@ export default function RegisterPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <div className="space-y-2">
               <Label htmlFor="role">Tipo de Conta</Label>
               <Select
