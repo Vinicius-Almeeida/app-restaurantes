@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api/client';
-import { useAuthStore } from '@/lib/stores/auth-store';
 import { OrderStatusBadge } from '@/components/order';
 import { LoadingScreen } from '@/components/common';
 import { Button } from '@/components/ui/button';
@@ -58,7 +57,6 @@ export default function OrderDetailsPage() {
 
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { user } = useAuthStore();
 
   useEffect(() => {
     fetchOrder();
@@ -68,10 +66,11 @@ export default function OrderDetailsPage() {
     try {
       const response = await apiClient.get<{ data: Order }>(`/orders/${orderId}`);
       setOrder(response.data.data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching order:', error);
       toast.error('Erro ao carregar pedido');
-      if (error.response?.status === 404) {
+      const axiosError = error as { response?: { status?: number } };
+      if (axiosError.response?.status === 404) {
         router.push('/restaurants');
       }
     } finally {
@@ -138,7 +137,7 @@ export default function OrderDetailsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {order.items.map((item) => (
+                    {Array.isArray(order.items) && order.items.map((item) => (
                       <div key={item.id} className="flex justify-between items-start">
                         <div className="flex-1">
                           <p className="font-medium">{item.menuItem.name}</p>
@@ -174,7 +173,7 @@ export default function OrderDetailsPage() {
               </Card>
 
               {/* Participants */}
-              {order.participants.length > 0 && (
+              {Array.isArray(order.participants) && order.participants.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle>Participantes ({order.participants.length})</CardTitle>
