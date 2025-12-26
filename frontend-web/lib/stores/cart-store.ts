@@ -10,6 +10,7 @@ export interface CartItem {
 interface CartState {
   items: CartItem[];
   restaurantId: string | null;
+  tableNumber: number | null;
 
   // Actions
   addItem: (item: { id: string; name: string; price: number }) => void;
@@ -17,6 +18,7 @@ interface CartState {
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
   setRestaurant: (restaurantId: string) => void;
+  setTableNumber: (tableNumber: number) => void;
   getTotal: () => number;
   getItemCount: () => number;
 }
@@ -24,6 +26,7 @@ interface CartState {
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   restaurantId: null,
+  tableNumber: null,
 
   addItem: (item) => {
     const { items } = get();
@@ -58,11 +61,15 @@ export const useCartStore = create<CartState>((set, get) => ({
   },
 
   clearCart: () => {
-    set({ items: [], restaurantId: null });
+    set({ items: [], restaurantId: null, tableNumber: null });
   },
 
   setRestaurant: (restaurantId) => {
     set({ restaurantId });
+  },
+
+  setTableNumber: (tableNumber) => {
+    set({ tableNumber });
   },
 
   getTotal: () => {

@@ -226,10 +226,13 @@ POST   /api/inventory/invoices/:id/confirm
 
 ### Commits (Conventional)
 ```
-feat|fix|docs|style|refactor|perf|test|chore(scope): description
+feat|fix|docs|style|refactor|perf|test|chore(scope): descricao em portugues
 ```
 
-**⚠️ REGRA ABSOLUTA: Commits SEM assinatura Claude** (sem 🤖 Generated, sem Co-Authored-By)
+**⚠️ REGRAS ABSOLUTAS:**
+
+- Commits SEM assinatura Claude (sem Generated, sem Co-Authored-By)
+- Mensagens de commit SEMPRE em portugues
 
 ---
 

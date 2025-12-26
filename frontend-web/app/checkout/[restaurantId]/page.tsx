@@ -18,10 +18,10 @@ export default function CheckoutPage() {
   const router = useRouter();
   const restaurantId = params.restaurantId as string;
 
-  const { items, getTotal, clearCart } = useCartStore();
+  const { items, getTotal, clearCart, tableNumber: storedTableNumber } = useCartStore();
   const { user } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
-  const [tableNumber, setTableNumber] = useState('');
+  const [tableNumber, setTableNumber] = useState(storedTableNumber?.toString() ?? '');
   const [notes, setNotes] = useState('');
 
   const formatPrice = (value: number) => {
@@ -67,9 +67,10 @@ export default function CheckoutPage() {
       toast.success('Pedido criado com sucesso!');
       clearCart();
       router.push(`/orders/${orderId}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating order:', error);
-      toast.error(error.response?.data?.message || 'Erro ao criar pedido');
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message ?? 'Erro ao criar pedido');
     } finally {
       setIsLoading(false);
     }
