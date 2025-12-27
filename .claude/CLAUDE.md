@@ -69,9 +69,10 @@
 - **Utils**: date-fns, Lucide React, Sonner
 
 ### Infra
-- Docker + Docker Compose
-- Nginx (Reverse Proxy + SSL)
-- Vercel (Frontend) / VPS (Backend)
+- **Database**: Supabase PostgreSQL (região: São Paulo)
+- **Backend**: Azure Container Apps
+- **Frontend**: Vercel
+- **Dev Local**: Docker + Docker Compose
 
 ---
 
@@ -96,18 +97,29 @@ Cada módulo: `controller.ts` → `service.ts` → `schema.ts` → `routes.ts`
 ### Frontend (Next.js App Router)
 ```
 frontend-web/app/
-├── (auth)/           # Login, Register
-├── restaurants/      # List restaurants
-├── r/[slug]/         # Restaurant menu
-├── checkout/[id]/    # Checkout
-├── split-bill/[id]/  # Split bill 🔥
-├── orders/           # My orders
-├── pay/[token]/      # Payment link 🔥
-└── dashboard/        # Restaurant panel
+├── (auth)/              # Login, Register
+├── mesa/[restaurantId]/[tableNumber]/  # QR Code entry 🔥
+├── r/[slug]/            # Restaurant menu
+├── checkout/[id]/       # Checkout
+├── split-bill/[id]/     # Split bill 🔥
+├── orders/              # My orders
+├── pay/[token]/         # Payment link 🔥
+└── dashboard/           # Restaurant panel
     ├── orders/
     ├── menu/
-    └── inventory/    # Stock + OCR 🔥
+    └── inventory/       # Stock + OCR 🔥
 ```
+
+### Fluxo Principal (Uso Interno no Restaurante)
+
+1. Cliente senta na mesa → Escaneia **QR Code da mesa**
+2. QR Code leva para `/mesa/{restaurantId}/{tableNumber}`
+3. Cliente visualiza cardápio e faz pedido
+4. Pedido vai para cozinha (real-time)
+5. Ao finalizar, cliente divide a conta (Split Bill)
+6. Cada participante paga sua parte via link único
+
+**⚠️ IMPORTANTE**: Este NÃO é um app de delivery. É para uso DENTRO do restaurante.
 
 ---
 
@@ -316,6 +328,16 @@ Padrão **AAA**: Arrange → Act → Assert
 > Segurança em pagamentos é inegociável.
 > Real-time é requisito, não feature.
 > Zero gambiarras, sempre definitivo.
+
+---
+
+## URLS DE PRODUÇÃO
+
+| Ambiente    | URL                                                                            |
+|-------------|--------------------------------------------------------------------------------|
+| Frontend    | `https://app-restaurantes.vercel.app`                                          |
+| Backend API | `https://tabsync-backend.gentlecoast-55c82748.eastus2.azurecontainerapps.io`   |
+| Database    | Supabase PostgreSQL (aws-1-sa-east-1)                                          |
 
 ---
 
