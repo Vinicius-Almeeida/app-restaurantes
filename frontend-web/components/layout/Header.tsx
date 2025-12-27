@@ -1,23 +1,28 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 export function Header() {
   const router = useRouter();
   const { user, isAuthenticated, logout, checkAuth } = useAuthStore();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     checkAuth();
@@ -86,47 +91,68 @@ export function Header() {
 
         <div className="flex items-center space-x-3">
           {isAuthenticated && user ? (
-            <>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center gap-2 h-10 px-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-orange-100 text-orange-700 text-sm">
-                        {getInitials(user.fullName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="hidden md:flex flex-col items-start">
-                      <span className="text-sm font-medium">{user.fullName.split(' ')[0]}</span>
-                      <span className="text-xs text-gray-500">{getRoleLabel(user.role)}</span>
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user.fullName}</p>
-                      <p className="text-xs leading-none text-gray-500">{user.email}</p>
-                      <p className="text-xs leading-none text-orange-600 mt-1">{getRoleLabel(user.role)}</p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="flex items-center gap-2 h-10 px-3 rounded-md hover:bg-gray-100 transition-colors"
+              >
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-orange-100 text-orange-700 text-sm">
+                    {getInitials(user.fullName)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden md:flex flex-col items-start">
+                  <span className="text-sm font-medium">{user.fullName.split(' ')[0]}</span>
+                  <span className="text-xs text-gray-500">{getRoleLabel(user.role)}</span>
+                </div>
+                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {isMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-[9999]">
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-sm font-medium text-gray-900">{user.fullName}</p>
+                    <p className="text-xs text-gray-500">{user.email}</p>
+                    <p className="text-xs text-orange-600 mt-1">{getRoleLabel(user.role)}</p>
+                  </div>
+
                   {user.role === 'RESTAURANT_OWNER' && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/dashboard">Dashboard</Link>
-                    </DropdownMenuItem>
+                    <Link
+                      href="/dashboard"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Dashboard
+                    </Link>
                   )}
                   {user.role === 'CUSTOMER' && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/orders">Meus Pedidos</Link>
-                    </DropdownMenuItem>
+                    <Link
+                      href="/orders"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Meus Pedidos
+                    </Link>
                   )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer">
-                    Sair da conta
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
+
+                  <div className="border-t border-gray-100 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                    >
+                      Sair da conta
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <Button asChild>
               <Link href="/login">Entrar</Link>
