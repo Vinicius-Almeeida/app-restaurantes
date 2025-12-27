@@ -4,24 +4,6 @@ import { Button } from '@/components/ui/button';
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
-      {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🍽️</span>
-            <span className="text-xl font-bold">TabSync</span>
-          </div>
-          <nav className="flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="ghost">Login</Button>
-            </Link>
-            <Link href="/register">
-              <Button>Começar</Button>
-            </Link>
-          </nav>
-        </div>
-      </header>
-
       {/* Hero */}
       <main className="container mx-auto px-4 py-20">
         <div className="mx-auto max-w-3xl text-center">

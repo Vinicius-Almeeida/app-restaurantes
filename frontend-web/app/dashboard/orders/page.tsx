@@ -6,7 +6,7 @@ import { apiClient } from '@/lib/api/client';
 import { ProtectedRoute } from '@/components/auth';
 import { OrderStatusBadge } from '@/components/order';
 import { LoadingScreen } from '@/components/common';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -20,8 +20,8 @@ interface Order {
   status: OrderStatus;
   totalAmount: number;
   createdAt: string;
-  customer: {
-    fullName: string;
+  customer?: {
+    fullName?: string;
   };
 }
 
@@ -67,9 +67,10 @@ function OrdersManagementContent() {
 
       // Update local state
       setOrders(orders.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating order status:', error);
-      toast.error(error.response?.data?.message || 'Erro ao atualizar status');
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || 'Erro ao atualizar status');
     }
   };
 
@@ -151,7 +152,7 @@ function OrdersManagementContent() {
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
                             <div>
                               <p className="text-gray-500">Cliente</p>
-                              <p className="font-medium">{order.customer.fullName}</p>
+                              <p className="font-medium">{order.customer?.fullName || 'Cliente não identificado'}</p>
                             </div>
                             <div>
                               <p className="text-gray-500">Data/Hora</p>
