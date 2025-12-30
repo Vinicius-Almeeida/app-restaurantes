@@ -21,12 +21,18 @@ async function main() {
   await prisma.order.deleteMany();
   await prisma.menuItem.deleteMany();
   await prisma.menuCategory.deleteMany();
+  await prisma.table.deleteMany();
+  await prisma.subscription.deleteMany();
+  await prisma.plan.deleteMany();
+  await prisma.consultantRestaurant.deleteMany();
+  await prisma.consultant.deleteMany();
+  await prisma.staff.deleteMany();
   await prisma.restaurant.deleteMany();
   await prisma.user.deleteMany();
 
   console.log('Creating users...');
 
-  // Create Admin
+  // Create Super Admin
   const adminPassword = await bcrypt.hash('admin123', 10);
   const admin = await prisma.user.create({
     data: {
@@ -34,7 +40,7 @@ async function main() {
       passwordHash: adminPassword,
       fullName: 'Admin TabSync',
       phone: '+55 11 99999-0000',
-      role: UserRole.ADMIN,
+      role: UserRole.SUPER_ADMIN,
       emailVerified: true,
     },
   });
@@ -87,6 +93,45 @@ async function main() {
     },
   });
 
+  // Create Consultant
+  const consultantPassword = await bcrypt.hash('teste123', 10);
+  const consultant = await prisma.user.create({
+    data: {
+      email: 'consultor@tabsync.com',
+      passwordHash: consultantPassword,
+      fullName: 'Roberto Consultor',
+      phone: '+55 11 93333-7777',
+      role: UserRole.CONSULTANT,
+      emailVerified: true,
+    },
+  });
+
+  // Create Waiter
+  const waiterPassword = await bcrypt.hash('teste123', 10);
+  const waiter = await prisma.user.create({
+    data: {
+      email: 'garcom@teste.com',
+      passwordHash: waiterPassword,
+      fullName: 'Carlos Garçom',
+      phone: '+55 11 94444-5555',
+      role: UserRole.WAITER,
+      emailVerified: true,
+    },
+  });
+
+  // Create Kitchen Staff
+  const kitchenPassword = await bcrypt.hash('teste123', 10);
+  const kitchen = await prisma.user.create({
+    data: {
+      email: 'cozinha@teste.com',
+      passwordHash: kitchenPassword,
+      fullName: 'José Cozinheiro',
+      phone: '+55 11 94444-6666',
+      role: UserRole.KITCHEN,
+      emailVerified: true,
+    },
+  });
+
   console.log('Creating restaurants...');
 
   // Create Restaurant 1 - Burger House
@@ -113,6 +158,94 @@ async function main() {
         saturday: { open: '11:00', close: '00:00' },
         sunday: { open: '12:00', close: '22:00' },
       },
+    },
+  });
+
+  console.log('Creating staff for Burger House...');
+
+  // Create Staff for Waiter
+  await prisma.staff.create({
+    data: {
+      userId: waiter.id,
+      restaurantId: restaurant1.id,
+      role: UserRole.WAITER,
+      pin: '1234',
+    },
+  });
+
+  // Create Staff for Kitchen
+  await prisma.staff.create({
+    data: {
+      userId: kitchen.id,
+      restaurantId: restaurant1.id,
+      role: UserRole.KITCHEN,
+      pin: '5678',
+    },
+  });
+
+  console.log('Creating consultant assignment...');
+
+  // Create Consultant
+  const consultantRecord = await prisma.consultant.create({
+    data: {
+      userId: consultant.id,
+      commissionPercent: 5.0,
+      totalOnboardings: 1,
+      totalEarnings: 0,
+    },
+  });
+
+  // Link consultant to restaurant
+  await prisma.consultantRestaurant.create({
+    data: {
+      consultantId: consultantRecord.id,
+      restaurantId: restaurant1.id,
+    },
+  });
+
+  console.log('Creating tables for Burger House...');
+
+  // Create Tables with QR codes
+  for (let i = 1; i <= 10; i++) {
+    await prisma.table.create({
+      data: {
+        restaurantId: restaurant1.id,
+        number: i,
+        capacity: i <= 5 ? 4 : 6,
+        qrCode: `table_${restaurant1.id}_${i}_${Math.random().toString(36).substring(2, 15)}`,
+      },
+    });
+  }
+
+  console.log('Creating plan and subscription...');
+
+  // Create Plan
+  const basicPlan = await prisma.plan.create({
+    data: {
+      name: 'Basic',
+      slug: 'basic',
+      description: 'Plano básico para restaurantes pequenos',
+      price: 99.90,
+      billingCycle: 'MONTHLY',
+      trialDays: 14,
+      maxTables: 10,
+      maxMenuItems: 50,
+      maxStaff: 5,
+      platformFeePercent: 2.5,
+      features: ['split_bill', 'basic_analytics'],
+      isActive: true,
+      displayOrder: 1,
+    },
+  });
+
+  // Create Subscription for restaurant1
+  await prisma.subscription.create({
+    data: {
+      restaurantId: restaurant1.id,
+      planId: basicPlan.id,
+      status: 'ACTIVE',
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     },
   });
 
@@ -981,13 +1114,27 @@ async function main() {
   console.log('');
   console.log('=== DEMO CREDENTIALS ===');
   console.log('');
-  console.log('Admin:');
+  console.log('Super Admin:');
   console.log('  Email: admin@tabsync.com');
   console.log('  Password: admin123');
   console.log('');
   console.log('Restaurant Owner:');
   console.log('  Email: restaurante@teste.com');
   console.log('  Password: teste123');
+  console.log('');
+  console.log('Consultant:');
+  console.log('  Email: consultor@tabsync.com');
+  console.log('  Password: teste123');
+  console.log('');
+  console.log('Waiter (Burger House):');
+  console.log('  Email: garcom@teste.com');
+  console.log('  Password: teste123');
+  console.log('  PIN: 1234');
+  console.log('');
+  console.log('Kitchen (Burger House):');
+  console.log('  Email: cozinha@teste.com');
+  console.log('  Password: teste123');
+  console.log('  PIN: 5678');
   console.log('');
   console.log('Customer:');
   console.log('  Email: cliente@teste.com');
@@ -998,6 +1145,8 @@ async function main() {
   console.log('1. Burger House');
   console.log('   Slug: burger-house');
   console.log('   URL: /r/burger-house');
+  console.log('   Tables: 10 (with QR codes)');
+  console.log('   Plan: Basic (Active)');
   console.log('');
   console.log('2. Sushi Master');
   console.log('   Slug: sushi-master');

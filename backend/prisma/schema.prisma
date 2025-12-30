@@ -1,5 +1,6 @@
 // TabSync - Prisma Schema
 // Restaurant ordering and payment management system
+// Multi-tenant SaaS architecture
 
 generator client {
   provider = "prisma-client-js"
@@ -11,14 +12,20 @@ datasource db {
 }
 
 // ============================================
-// USERS
+// ENUMS - USER & ROLES
 // ============================================
 enum UserRole {
-  CUSTOMER
-  RESTAURANT_OWNER
-  ADMIN
+  SUPER_ADMIN      // Platform owners
+  CONSULTANT       // Onboarding consultants
+  RESTAURANT_OWNER // Restaurant admin
+  WAITER           // Waiter staff
+  KITCHEN          // Kitchen staff
+  CUSTOMER         // End customer
 }
 
+// ============================================
+// USERS
+// ============================================
 model User {
   id            String   @id @default(uuid())
   email         String   @unique
@@ -32,15 +39,85 @@ model User {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
-  ownedRestaurants   Restaurant[]
-  orderParticipations OrderParticipant[]
-  orderItems         OrderItem[]
-  splitPayments      SplitPayment[]
-  analyticsEvents    AnalyticsEvent[]
+  ownedRestaurants     Restaurant[]
+  orderParticipations  OrderParticipant[]
+  orderItems           OrderItem[]
+  splitPayments        SplitPayment[]
+  analyticsEvents      AnalyticsEvent[]
+  staffAssignments     Staff[]
+  tableSessionMembers  TableSessionMember[]
+  reviews              Review[]
+  suggestions          Suggestion[]
+  complaints           Complaint[]
+  npsResponses         NpsResponse[]
+  consultant           Consultant?
+  auditLogs            AuditLog[]
 
   @@index([email])
   @@index([role])
   @@map("users")
+}
+
+// ============================================
+// STAFF - Restaurant Employees
+// ============================================
+model Staff {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  restaurantId String   @map("restaurant_id")
+  role         UserRole // WAITER or KITCHEN
+  pin          String?  // Quick access PIN for POS
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, restaurantId])
+  @@index([restaurantId])
+  @@index([userId])
+  @@index([isActive])
+  @@map("staff")
+}
+
+// ============================================
+// CONSULTANTS - Onboarding Partners
+// ============================================
+model Consultant {
+  id                String   @id @default(uuid())
+  userId            String   @unique @map("user_id")
+  commissionPercent Decimal  @db.Decimal(5, 2) @map("commission_percent")
+  totalOnboardings  Int      @default(0) @map("total_onboardings")
+  totalEarnings     Decimal  @default(0) @db.Decimal(10, 2) @map("total_earnings")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  onboardedRestaurants ConsultantRestaurant[]
+
+  @@index([isActive])
+  @@map("consultants")
+}
+
+// Consultant-Restaurant relationship (who onboarded which restaurant)
+model ConsultantRestaurant {
+  id           String   @id @default(uuid())
+  consultantId String   @map("consultant_id")
+  restaurantId String   @map("restaurant_id")
+  onboardedAt  DateTime @default(now()) @map("onboarded_at")
+
+  // Relations
+  consultant Consultant @relation(fields: [consultantId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([consultantId, restaurantId])
+  @@index([consultantId])
+  @@index([restaurantId])
+  @@map("consultant_restaurants")
 }
 
 // ============================================
@@ -71,25 +148,231 @@ model Restaurant {
   acceptsOrders   Boolean  @default(true) @map("accepts_orders")
   currency        String   @default("BRL")
   operatingHours  Json?    @map("operating_hours")
+  timezone        String   @default("America/Sao_Paulo")
 
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   // Relations
-  owner           User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  menuCategories  MenuCategory[]
-  menuItems       MenuItem[]
-  orders          Order[]
-  analyticsEvents AnalyticsEvent[]
-  suppliers       Supplier[]
-  inventoryItems  InventoryItem[]
-  invoiceUploads  InvoiceUpload[]
-  stockEntries    StockEntry[]
+  owner              User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  menuCategories     MenuCategory[]
+  menuItems          MenuItem[]
+  orders             Order[]
+  analyticsEvents    AnalyticsEvent[]
+  suppliers          Supplier[]
+  inventoryItems     InventoryItem[]
+  invoiceUploads     InvoiceUpload[]
+  stockEntries       StockEntry[]
+  staff              Staff[]
+  tables             Table[]
+  tableSessions      TableSession[]
+  subscription       Subscription?
+  reviews            Review[]
+  suggestions        Suggestion[]
+  complaints         Complaint[]
+  npsResponses       NpsResponse[]
+  consultantOnboard  ConsultantRestaurant[]
 
   @@index([ownerId])
   @@index([slug])
   @@index([isActive])
   @@map("restaurants")
+}
+
+// ============================================
+// TABLES - Restaurant Tables
+// ============================================
+model Table {
+  id           String   @id @default(uuid())
+  restaurantId String   @map("restaurant_id")
+  number       Int
+  name         String?  // Optional custom name like "Varanda 1"
+  qrCode       String   @unique @map("qr_code")
+  capacity     Int      @default(4)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant    Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tableSessions TableSession[]
+
+  @@unique([restaurantId, number])
+  @@index([restaurantId])
+  @@index([qrCode])
+  @@index([isActive])
+  @@map("tables")
+}
+
+// ============================================
+// TABLE SESSIONS - Active Table Sessions
+// ============================================
+enum SessionStatus {
+  ACTIVE
+  PAYMENT
+  CLOSED
+}
+
+model TableSession {
+  id           String        @id @default(uuid())
+  tableId      String        @map("table_id")
+  restaurantId String        @map("restaurant_id")
+  status       SessionStatus @default(ACTIVE)
+  startedAt    DateTime      @default(now()) @map("started_at")
+  closedAt     DateTime?     @map("closed_at")
+
+  // Session totals (calculated)
+  subtotal     Decimal       @default(0) @db.Decimal(10, 2)
+  taxAmount    Decimal       @default(0) @db.Decimal(10, 2) @map("tax_amount")
+  totalAmount  Decimal       @default(0) @db.Decimal(10, 2) @map("total_amount")
+
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  table       Table                @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  restaurant  Restaurant           @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  members     TableSessionMember[]
+  orders      Order[]
+  reviews     Review[]
+  complaints  Complaint[]
+  npsResponses NpsResponse[]
+
+  @@index([tableId])
+  @@index([restaurantId])
+  @@index([status])
+  @@index([startedAt(sort: Desc)])
+  @@map("table_sessions")
+}
+
+// ============================================
+// TABLE SESSION MEMBERS - People at Table
+// ============================================
+enum MemberRole {
+  OWNER  // Created the session
+  MEMBER // Joined the session
+}
+
+enum MemberStatus {
+  PENDING  // Waiting approval
+  APPROVED // Can order
+  LEFT     // Left the table
+}
+
+enum MemberPaymentStatus {
+  PENDING // Has not paid yet
+  PAID    // Paid via digital method
+  CASH    // Paid in cash
+}
+
+model TableSessionMember {
+  id            String              @id @default(uuid())
+  sessionId     String              @map("session_id")
+  userId        String              @map("user_id")
+  role          MemberRole          @default(MEMBER)
+  status        MemberStatus        @default(PENDING)
+  paymentStatus MemberPaymentStatus @default(PENDING) @map("payment_status")
+  amountDue     Decimal?            @db.Decimal(10, 2) @map("amount_due")
+  amountPaid    Decimal?            @db.Decimal(10, 2) @map("amount_paid")
+  exitQrCode    String?             @map("exit_qr_code")
+  joinedAt      DateTime            @default(now()) @map("joined_at")
+  leftAt        DateTime?           @map("left_at")
+
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  session TableSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@index([sessionId])
+  @@index([userId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@map("table_session_members")
+}
+
+// ============================================
+// PLANS - Subscription Plans
+// ============================================
+model Plan {
+  id                 String   @id @default(uuid())
+  name               String   // Free, Basic, Pro, Enterprise
+  slug               String   @unique
+  description        String?  @db.Text
+  price              Decimal  @db.Decimal(10, 2)
+  billingCycle       String   @default("MONTHLY") @map("billing_cycle") // MONTHLY, YEARLY
+  trialDays          Int      @default(14) @map("trial_days")
+
+  // Limits
+  maxTables          Int?     @map("max_tables")
+  maxMenuItems       Int?     @map("max_menu_items")
+  maxStaff           Int?     @map("max_staff")
+  maxOrders          Int?     @map("max_orders") // Per month
+
+  // Fees
+  platformFeePercent Decimal  @db.Decimal(5, 2) @map("platform_fee_percent")
+
+  // Features (JSON array of feature keys)
+  features           Json     // ["split_bill", "ocr_inventory", "analytics", "api_access"]
+
+  isActive           Boolean  @default(true) @map("is_active")
+  displayOrder       Int      @default(0) @map("display_order")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  subscriptions Subscription[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@map("plans")
+}
+
+// ============================================
+// SUBSCRIPTIONS - Restaurant Subscriptions
+// ============================================
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  SUSPENDED
+}
+
+model Subscription {
+  id                 String             @id @default(uuid())
+  restaurantId       String             @unique @map("restaurant_id")
+  planId             String             @map("plan_id")
+  status             SubscriptionStatus @default(TRIAL)
+
+  // Trial period
+  trialEndsAt        DateTime?          @map("trial_ends_at")
+
+  // Billing period
+  currentPeriodStart DateTime           @map("current_period_start")
+  currentPeriodEnd   DateTime           @map("current_period_end")
+
+  // Gateway info
+  gatewayCustomerId  String?            @map("gateway_customer_id")
+  gatewaySubscriptionId String?         @map("gateway_subscription_id")
+
+  // Cancellation
+  cancelledAt        DateTime?          @map("cancelled_at")
+  cancellationReason String?            @db.Text @map("cancellation_reason")
+
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  plan       Plan       @relation(fields: [planId], references: [id])
+
+  @@index([planId])
+  @@index([status])
+  @@index([currentPeriodEnd])
+  @@map("subscriptions")
 }
 
 // ============================================
@@ -163,6 +446,7 @@ enum OrderStatus {
 model Order {
   id              String      @id @default(uuid())
   restaurantId    String      @map("restaurant_id")
+  tableSessionId  String?     @map("table_session_id")
   orderNumber     String      @unique @map("order_number")
   tableNumber     String?     @map("table_number")
   status          OrderStatus @default(PENDING)
@@ -173,7 +457,7 @@ model Order {
   discountAmount  Decimal     @default(0) @db.Decimal(10, 2) @map("discount_amount")
   totalAmount     Decimal     @db.Decimal(10, 2) @map("total_amount")
 
-  // Split bill feature 🔥
+  // Split bill feature
   isSplit         Boolean     @default(false) @map("is_split")
   splitCount      Int         @default(1) @map("split_count")
 
@@ -186,13 +470,15 @@ model Order {
   cancelledAt     DateTime?   @map("cancelled_at")
 
   // Relations
-  restaurant   Restaurant         @relation(fields: [restaurantId], references: [id])
-  orderItems   OrderItem[]
-  participants OrderParticipant[]
-  payments     Payment[]
+  restaurant    Restaurant         @relation(fields: [restaurantId], references: [id])
+  tableSession  TableSession?      @relation(fields: [tableSessionId], references: [id])
+  orderItems    OrderItem[]
+  participants  OrderParticipant[]
+  payments      Payment[]
   splitPayments SplitPayment[]
 
   @@index([restaurantId])
+  @@index([tableSessionId])
   @@index([status])
   @@index([createdAt(sort: Desc)])
   @@map("orders")
@@ -208,7 +494,7 @@ model OrderItem {
   customizations Json?
   notes          String?  @db.Text
 
-  // Sharing feature 🔥
+  // Sharing feature
   isShared       Boolean  @default(false) @map("is_shared")
   sharedWith     String[] @map("shared_with")
 
@@ -243,7 +529,7 @@ model OrderParticipant {
 }
 
 // ============================================
-// PAYMENTS 🔥
+// PAYMENTS
 // ============================================
 enum PaymentMethod {
   CREDIT_CARD
@@ -285,7 +571,7 @@ model Payment {
   @@map("payments")
 }
 
-// CORE FEATURE: Split Payments 🔥🔥
+// CORE FEATURE: Split Payments
 enum SplitMethod {
   EQUAL
   BY_ITEM
@@ -329,6 +615,171 @@ model SplitPayment {
 }
 
 // ============================================
+// REVIEWS - Customer Reviews
+// ============================================
+model Review {
+  id              String        @id @default(uuid())
+  restaurantId    String        @map("restaurant_id")
+  userId          String        @map("user_id")
+  tableSessionId  String?       @map("table_session_id")
+
+  // Ratings (1-5 scale)
+  overallRating   Int           @map("overall_rating")
+  foodRating      Int?          @map("food_rating")
+  serviceRating   Int?          @map("service_rating")
+  ambianceRating  Int?          @map("ambiance_rating")
+  waitTimeRating  Int?          @map("wait_time_rating")
+  valueRating     Int?          @map("value_rating")
+
+  comment         String?       @db.Text
+  response        String?       @db.Text // Restaurant response
+  respondedAt     DateTime?     @map("responded_at")
+
+  isPublic        Boolean       @default(true) @map("is_public")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tableSession TableSession? @relation(fields: [tableSessionId], references: [id])
+
+  @@unique([restaurantId, userId, tableSessionId])
+  @@index([restaurantId])
+  @@index([userId])
+  @@index([tableSessionId])
+  @@index([overallRating])
+  @@index([createdAt(sort: Desc)])
+  @@map("reviews")
+}
+
+// ============================================
+// SUGGESTIONS - Customer Suggestions
+// ============================================
+enum SuggestionCategory {
+  MENU
+  SERVICE
+  AMBIANCE
+  OTHER
+}
+
+enum SuggestionStatus {
+  UNREAD
+  READ
+  RESPONDED
+}
+
+model Suggestion {
+  id           String             @id @default(uuid())
+  restaurantId String             @map("restaurant_id")
+  userId       String?            @map("user_id")
+  category     SuggestionCategory
+  content      String             @db.Text
+  isAnonymous  Boolean            @default(false) @map("is_anonymous")
+  status       SuggestionStatus   @default(UNREAD)
+  response     String?            @db.Text
+  respondedAt  DateTime?          @map("responded_at")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user       User?      @relation(fields: [userId], references: [id])
+
+  @@index([restaurantId])
+  @@index([userId])
+  @@index([category])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("suggestions")
+}
+
+// ============================================
+// COMPLAINTS - Customer Complaints
+// ============================================
+enum ComplaintCategory {
+  FOOD_QUALITY
+  SERVICE
+  WAIT_TIME
+  BILLING
+  HYGIENE
+  OTHER
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ComplaintStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  ESCALATED
+  CLOSED
+}
+
+model Complaint {
+  id               String            @id @default(uuid())
+  restaurantId     String            @map("restaurant_id")
+  userId           String            @map("user_id")
+  tableSessionId   String?           @map("table_session_id")
+  category         ComplaintCategory
+  priority         Priority          @default(MEDIUM)
+  status           ComplaintStatus   @default(OPEN)
+  subject          String
+  description      String            @db.Text
+  escalatedToSuper Boolean           @default(false) @map("escalated_to_super")
+  response         String?           @db.Text
+  respondedAt      DateTime?         @map("responded_at")
+  resolvedAt       DateTime?         @map("resolved_at")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tableSession TableSession? @relation(fields: [tableSessionId], references: [id])
+
+  @@index([restaurantId])
+  @@index([userId])
+  @@index([tableSessionId])
+  @@index([category])
+  @@index([priority])
+  @@index([status])
+  @@index([escalatedToSuper])
+  @@index([createdAt(sort: Desc)])
+  @@map("complaints")
+}
+
+// ============================================
+// NPS RESPONSES - Net Promoter Score
+// ============================================
+model NpsResponse {
+  id             String        @id @default(uuid())
+  restaurantId   String        @map("restaurant_id")
+  userId         String        @map("user_id")
+  tableSessionId String?       @map("table_session_id")
+  score          Int           // 0-10
+  feedback       String?       @db.Text
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tableSession TableSession? @relation(fields: [tableSessionId], references: [id])
+
+  @@index([restaurantId])
+  @@index([userId])
+  @@index([tableSessionId])
+  @@index([score])
+  @@index([createdAt(sort: Desc)])
+  @@map("nps_responses")
+}
+
+// ============================================
 // ANALYTICS
 // ============================================
 model AnalyticsEvent {
@@ -350,7 +801,32 @@ model AnalyticsEvent {
 }
 
 // ============================================
-// INVENTORY & STOCK MANAGEMENT 🔥
+// AUDIT LOG - LGPD/Compliance
+// ============================================
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?  @map("user_id")
+  action      String   // LOGIN, LOGOUT, CREATE_ORDER, PROCESS_PAYMENT, etc.
+  entityType  String?  @map("entity_type")  // User, Order, Payment, etc.
+  entityId    String?  @map("entity_id")
+  oldValue    Json?    @map("old_value")
+  newValue    Json?    @map("new_value")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent") @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+// ============================================
+// INVENTORY & STOCK MANAGEMENT
 // ============================================
 
 // Supplier/Fornecedor
@@ -412,7 +888,7 @@ model InventoryItem {
   @@map("inventory_items")
 }
 
-// Relação Many-to-Many entre MenuItem e InventoryItem
+// Relation Many-to-Many entre MenuItem e InventoryItem
 model MenuItemInventory {
   id              String   @id @default(uuid())
   menuItemId      String   @map("menu_item_id")
@@ -483,9 +959,9 @@ model InvoiceUpload {
 enum StockEntryType {
   PURCHASE      // Compra
   ADJUSTMENT    // Ajuste
-  RETURN        // Devolução
+  RETURN        // Devolucao
   LOSS          // Perda/Quebra
-  TRANSFER      // Transferência
+  TRANSFER      // Transferencia
 }
 
 model StockEntry {
