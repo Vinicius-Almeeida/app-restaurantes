@@ -2,52 +2,358 @@
 
 ## MISSÃO
 
-**TabSync** - Plataforma SaaS para gestão de pedidos e pagamentos em restaurantes com **divisão inteligente de contas (Split Bill)**.
-
-**Padrão: ENTERPRISE-LEVEL FAANG** (Meta, Google, Amazon, Netflix, Apple, X)
+**TabSync** - Plataforma SaaS multi-tenant para gestão de pedidos e pagamentos em restaurantes com **divisão inteligente de contas (Split Bill)**.
 
 ---
 
-## FILOSOFIA CORE
+## 🏆 SELO DE QUALIDADE FAANG
 
-### Prioridades (em ordem)
-1. **SEGURANÇA** - Código seguro sempre
-2. **CORRETUDE** - Código que funciona corretamente
-3. **CLAREZA** - Código legível e manutenível
-4. **PERFORMANCE** - Código otimizado
+```
+╔══════════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║   ⭐ FAANG-LEVEL CERTIFIED DEVELOPMENT ⭐                        ║
+║                                                                  ║
+║   Este projeto segue padrões de desenvolvimento das maiores      ║
+║   empresas de tecnologia do mundo:                               ║
+║                                                                  ║
+║   Meta • Google • Amazon • Netflix • Apple • X                   ║
+║                                                                  ║
+║   ─────────────────────────────────────────────────────────────  ║
+║                                                                  ║
+║   COMPROMISSO:                                                   ║
+║   ✓ Zero gambiarras                                              ║
+║   ✓ Zero soluções temporárias                                    ║
+║   ✓ Zero "TODO: fix later"                                       ║
+║   ✓ Zero comprometimento da qualidade                            ║
+║   ✓ Código definitivo desde a primeira linha                     ║
+║                                                                  ║
+║   NÍVEL: ENTERPRISE | EQUIPE: SENIOR GLOBAL                      ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+```
 
-### ZERO Tolerância
-- ❌ Gambiarras, workarounds, "TODO: fix later"
-- ❌ `any` no TypeScript
-- ❌ Ignorar erros silenciosamente
-- ❌ Skip de testes ou linting
-- ❌ Código comentado "para depois"
+---
 
-### Compliance
-- LGPD (dados pessoais)
-- PCI-DSS (pagamentos)
-- ISO 27001 (segurança)
+## 🛡️ COMPLIANCE, GOVERNANÇA E SEGURANÇA
+
+> **SEGURANÇA VEM ANTES DE QUALQUER FEATURE**
+
+### Frameworks de Compliance
+
+| Framework | Escopo | Status |
+|-----------|--------|--------|
+| **LGPD** | Dados pessoais de usuários brasileiros | Obrigatório |
+| **PCI-DSS** | Processamento de pagamentos | Obrigatório |
+| **ISO 27001** | Sistema de gestão de segurança | Referência |
+| **SOC 2 Type II** | Controles de segurança | Referência |
+| **OWASP Top 10** | Vulnerabilidades web | Obrigatório |
+
+### Governança de Dados
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CLASSIFICAÇÃO DE DADOS                   │
+├─────────────────────────────────────────────────────────────┤
+│ 🔴 CRÍTICO    │ Senhas, tokens, dados de cartão, CPF       │
+│               │ → Criptografia AES-256, nunca em logs      │
+├───────────────┼─────────────────────────────────────────────┤
+│ 🟠 SENSÍVEL   │ Email, telefone, endereço, pedidos         │
+│               │ → Acesso controlado, audit trail           │
+├───────────────┼─────────────────────────────────────────────┤
+│ 🟡 INTERNO    │ Métricas, configurações, cardápio          │
+│               │ → Acesso por role                          │
+├───────────────┼─────────────────────────────────────────────┤
+│ 🟢 PÚBLICO    │ Nome do restaurante, categorias            │
+│               │ → Sem restrições                           │
+└───────────────┴─────────────────────────────────────────────┘
+```
+
+### Princípios de Segurança
+
+1. **Defense in Depth** - Múltiplas camadas de proteção
+2. **Least Privilege** - Mínimo acesso necessário
+3. **Zero Trust** - Nunca confie, sempre verifique
+4. **Secure by Default** - Seguro desde o design
+5. **Fail Secure** - Em caso de erro, falhe de forma segura
+
+### Audit Trail Obrigatório
+
+Eventos que DEVEM ser logados:
+- Login/logout (sucesso e falha)
+- Criação/modificação de pedidos
+- Processamento de pagamentos
+- Alterações de permissões
+- Acesso negado
+- Modificações em dados sensíveis
+
+---
+
+## 🎯 FILOSOFIA CORE
+
+### Prioridades (em ordem ABSOLUTA)
+
+```
+1. 🛡️ SEGURANÇA    → Código seguro sempre, sem exceções
+2. ✅ CORRETUDE    → Código que funciona corretamente
+3. 📖 CLAREZA      → Código legível e manutenível
+4. ⚡ PERFORMANCE  → Código otimizado
+```
+
+### ❌ ZERO TOLERÂNCIA - INEGOCIÁVEL
+
+| Proibido | Consequência |
+|----------|--------------|
+| Gambiarras / workarounds | Rejeição imediata |
+| "TODO: fix later" | Rejeição imediata |
+| `any` no TypeScript | Rejeição imediata |
+| Ignorar erros silenciosamente | Rejeição imediata |
+| Skip de testes ou linting | Rejeição imediata |
+| Código comentado "para depois" | Rejeição imediata |
+| Soluções temporárias | Rejeição imediata |
+| "Funciona, depois melhoro" | Rejeição imediata |
+| Copiar código sem entender | Rejeição imediata |
+| Secrets hardcoded | Rejeição imediata |
 
 ### Métricas de Qualidade
-- Cobertura de Testes: ≥ 80%
-- Code Review: 100%
-- Zero Bugs Críticos em Produção
-- Documentação: 100% das APIs
+
+| Métrica | Target | Bloqueante |
+|---------|--------|------------|
+| Cobertura de Testes | ≥ 80% | Sim |
+| Code Review | 100% | Sim |
+| Bugs Críticos em Prod | 0 | Sim |
+| Documentação de APIs | 100% | Sim |
+| Vulnerabilidades Críticas | 0 | Sim |
+| TypeScript Strict | 100% | Sim |
 
 ---
 
-## PRINCÍPIOS FUNDAMENTAIS
+## 🏗️ ARQUITETURA MULTI-TENANT
 
-1. **SOLID** - Single Responsibility, Open/Closed, Liskov, Interface Segregation, Dependency Inversion
-2. **DRY** - Don't Repeat Yourself (única fonte de verdade)
-3. **KISS** - Keep It Simple, Stupid (sem over-engineering)
-4. **YAGNI** - You Ain't Gonna Need It (não implemente "para o futuro")
-5. **Fail Fast** - Detecte erros o mais cedo possível
-6. **Defense in Depth** - Rate Limit → CORS → Auth → Authorization → Validation → Business Logic
+### Hierarquia de Usuários
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     NÍVEL 1 - PLATAFORMA                    │
+├─────────────────────────────────────────────────────────────┤
+│  SUPER_ADMIN     │ Donos da plataforma TabSync              │
+│  CONSULTANT      │ Consultores de onboarding                │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    NÍVEL 2 - RESTAURANTE                    │
+├─────────────────────────────────────────────────────────────┤
+│  RESTAURANT_OWNER │ Admin do restaurante                    │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      NÍVEL 3 - STAFF                        │
+├─────────────────────────────────────────────────────────────┤
+│  WAITER          │ Garçom                                   │
+│  KITCHEN         │ Equipe de cozinha                        │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    NÍVEL 4 - CLIENTE                        │
+├─────────────────────────────────────────────────────────────┤
+│  CUSTOMER        │ Cliente final (conta global)             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Separação de Ambientes
+
+| Rota | Usuários | Descrição |
+|------|----------|-----------|
+| `/login` | CUSTOMER | Login de clientes |
+| `/register` | CUSTOMER | Cadastro de clientes |
+| `/restaurant/login` | OWNER, WAITER, KITCHEN | Login staff |
+| `/super-admin` | SUPER_ADMIN, CONSULTANT | Painel da plataforma |
+
+### Fluxo do Cliente na Mesa
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    JORNADA DO CLIENTE                       │
+└─────────────────────────────────────────────────────────────┘
+
+1. 📱 Escaneia QR Code da mesa
+         │
+         ▼
+2. 👑 Primeiro a escanear = DONO DA MESA
+         │
+         ▼
+3. 👥 Outros escaneiam → Solicitam entrada
+         │
+         ▼
+4. ✅ Dono aceita/recusa membros
+         │
+         ▼
+5. 🍽️ Todos podem fazer pedidos → Comanda compartilhada
+         │
+         ▼
+6. 📊 Acompanhamento real-time
+   (Recebido → Preparando → Pronto → Entregue)
+         │
+         ▼
+7. 💰 Fechamento com Split Bill
+   ├── Dividir igualmente
+   ├── Por item (quem pediu, paga)
+   ├── Percentual
+   └── Customizado
+         │
+         ▼
+8. 💳 Cada pessoa paga sua parte
+         │
+         ├── ✅ Pagou → Recebe QR de saída
+         └── ❌ Não pagou → Vai ao caixa físico
+```
 
 ---
 
-## STACK TECNOLÓGICO
+## 👥 AGENTES ESPECIALIZADOS - SELO FAANG
+
+```
+╔══════════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║   🏅 FAANG-CERTIFIED AGENT                                       ║
+║                                                                  ║
+║   Cada agente opera com padrões de excelência global.            ║
+║   Código produzido é DEFINITIVO, não requer revisão posterior.   ║
+║                                                                  ║
+║   REGRAS DO AGENTE:                                              ║
+║   • Entrega código pronto para produção                          ║
+║   • Zero débito técnico                                          ║
+║   • Documentação inline quando necessário                        ║
+║   • Testes incluídos quando aplicável                            ║
+║   • Segurança validada                                           ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+```
+
+### Distribuição de Responsabilidades
+
+| Domínio | Agente Principal | Agente Suporte | Responsabilidade |
+|---------|------------------|----------------|------------------|
+| **Database** | `database-architect` | `database-optimizer` | Schema, migrations, queries |
+| **Backend API** | `backend-architect` | `api-security-audit` | Endpoints, services, validação |
+| **Frontend** | `nextjs-architecture-expert` | `frontend-developer` | Componentes, páginas, state |
+| **Segurança** | `security-auditor` | `penetration-tester` | Audit, vulnerabilidades |
+| **Performance** | `performance-engineer` | `web-vitals-optimizer` | Otimização, métricas |
+| **Testes** | `test-automator` | `debugger` | Unit, integration, E2E |
+| **DevOps** | `devops-engineer` | `vercel-deployment-specialist` | CI/CD, infra |
+| **Documentação** | `api-documenter` | `technical-writer` | OpenAPI, guides |
+| **Code Quality** | `code-reviewer` | `unused-code-cleaner` | Review, cleanup |
+
+### Protocolo de Trabalho dos Agentes
+
+```
+1. RECEBE TAREFA
+   │
+   ▼
+2. ANALISA CONTEXTO (lê arquivos relacionados)
+   │
+   ▼
+3. PLANEJA IMPLEMENTAÇÃO
+   │
+   ▼
+4. IMPLEMENTA COM QUALIDADE FAANG
+   │
+   ├── TypeScript strict
+   ├── Validação Zod
+   ├── Error handling
+   ├── Segurança
+   └── Documentação
+   │
+   ▼
+5. VALIDA (lint, types, testes se aplicável)
+   │
+   ▼
+6. ENTREGA CÓDIGO DEFINITIVO
+```
+
+---
+
+## 📊 SUPER ADMIN DASHBOARD
+
+### Métricas de Negócio
+
+| Métrica | Descrição | Visualização |
+|---------|-----------|--------------|
+| **MRR** | Monthly Recurring Revenue | Gráfico + Número |
+| **ARR** | Annual Recurring Revenue | Gráfico + Número |
+| **Churn** | Taxa de cancelamento | Percentual |
+| **LTV** | Lifetime Value | Valor médio |
+| **CAC** | Custo de Aquisição | Valor médio |
+| **DAU/MAU** | Usuários ativos | Gráfico |
+| **GMV** | Volume transacionado | Gráfico + Número |
+
+### Módulos do Painel
+
+```
+super-admin/
+├── dashboard/        # Overview com métricas principais
+├── restaurants/      # Gestão de restaurantes
+│   ├── list/        # Lista com filtros
+│   ├── [id]/        # Detalhes
+│   └── onboarding/  # Processo de setup
+├── users/           # Gestão de usuários
+├── billing/         # Planos e assinaturas
+│   ├── plans/       # Configuração de planos
+│   ├── subscriptions/ # Assinaturas ativas
+│   └── invoices/    # Cobranças
+├── operations/      # Monitoramento
+│   ├── realtime/    # Status em tempo real
+│   ├── health/      # Saúde do sistema
+│   └── alerts/      # Alertas e incidentes
+├── consultants/     # Gestão de consultores
+└── support/         # Tickets e SLA
+```
+
+---
+
+## ⭐ SISTEMA DE AVALIAÇÕES E FEEDBACK
+
+### Avaliações
+
+```typescript
+interface Review {
+  overallRating: 1 | 2 | 3 | 4 | 5;
+  categories: {
+    food: number;        // Comida
+    service: number;     // Atendimento
+    ambiance: number;    // Ambiente
+    waitTime: number;    // Tempo de espera
+    value: number;       // Custo-benefício
+  };
+  comment?: string;
+  restaurantResponse?: string;
+}
+```
+
+### Sugestões
+
+- Caixa de sugestões com categorias
+- Opção anônima ou identificada
+- Status de leitura/resposta
+
+### Reclamações
+
+- Canal direto com restaurante
+- Níveis de prioridade
+- Escalonamento para Super Admin
+- SLA de resposta
+
+### NPS (Net Promoter Score)
+
+- Pesquisa pós-visita
+- Classificação: Detratores (0-6), Neutros (7-8), Promotores (9-10)
+- Tracking mensal
+
+---
+
+## 🔧 STACK TECNOLÓGICO
 
 ### Backend
 - **Runtime**: Node.js 20+ / Express.js 4.21+
@@ -76,54 +382,18 @@
 
 ---
 
-## ARQUITETURA
+## 📐 PRINCÍPIOS FUNDAMENTAIS
 
-### Backend (Modular)
-```
-backend/src/modules/
-├── auth/          # JWT authentication
-├── users/         # User management
-├── restaurants/   # Restaurant management
-├── menu/          # Categories + items
-├── orders/        # Order system
-├── payments/      # Payments + Split Bill 🔥
-│   └── gateway/   # Stripe/MercadoPago abstraction
-├── inventory/     # Stock + OCR 🔥
-└── analytics/     # Metrics
-```
-
-Cada módulo: `controller.ts` → `service.ts` → `schema.ts` → `routes.ts`
-
-### Frontend (Next.js App Router)
-```
-frontend-web/app/
-├── (auth)/              # Login, Register
-├── mesa/[restaurantId]/[tableNumber]/  # QR Code entry 🔥
-├── r/[slug]/            # Restaurant menu
-├── checkout/[id]/       # Checkout
-├── split-bill/[id]/     # Split bill 🔥
-├── orders/              # My orders
-├── pay/[token]/         # Payment link 🔥
-└── dashboard/           # Restaurant panel
-    ├── orders/
-    ├── menu/
-    └── inventory/       # Stock + OCR 🔥
-```
-
-### Fluxo Principal (Uso Interno no Restaurante)
-
-1. Cliente senta na mesa → Escaneia **QR Code da mesa**
-2. QR Code leva para `/mesa/{restaurantId}/{tableNumber}`
-3. Cliente visualiza cardápio e faz pedido
-4. Pedido vai para cozinha (real-time)
-5. Ao finalizar, cliente divide a conta (Split Bill)
-6. Cada participante paga sua parte via link único
-
-**⚠️ IMPORTANTE**: Este NÃO é um app de delivery. É para uso DENTRO do restaurante.
+1. **SOLID** - Single Responsibility, Open/Closed, Liskov, Interface Segregation, Dependency Inversion
+2. **DRY** - Don't Repeat Yourself (única fonte de verdade)
+3. **KISS** - Keep It Simple, Stupid (sem over-engineering)
+4. **YAGNI** - You Ain't Gonna Need It (não implemente "para o futuro")
+5. **Fail Fast** - Detecte erros o mais cedo possível
+6. **Defense in Depth** - Rate Limit → CORS → Auth → Authorization → Validation → Business Logic
 
 ---
 
-## TYPESCRIPT - REGRAS ABSOLUTAS
+## 📝 TYPESCRIPT - REGRAS ABSOLUTAS
 
 - **strict: true** em tsconfig.json
 - **NUNCA** usar `any` → usar `unknown` com type guards ou generics
@@ -132,7 +402,7 @@ frontend-web/app/
 
 ---
 
-## NOMENCLATURA
+## 📛 NOMENCLATURA
 
 | Elemento | Convenção | Exemplo |
 |----------|-----------|---------|
@@ -146,7 +416,7 @@ frontend-web/app/
 
 ---
 
-## SEGURANÇA - CRÍTICO
+## 🔐 SEGURANÇA - CRÍTICO
 
 ### Autenticação
 - Access Token: 15min / Refresh Token: 7 dias
@@ -168,69 +438,113 @@ frontend-web/app/
 
 ---
 
-## RBAC (Roles)
+## 👤 RBAC (Roles)
 
-| Role | Permissões |
-|------|------------|
-| **ADMIN** | Sistema completo |
-| **RESTAURANT_OWNER** | Seus restaurantes, cardápio, pedidos, estoque, analytics |
-| **CUSTOMER** | Ver restaurantes, fazer pedidos, dividir conta, pagar |
+| Role | Nível | Permissões |
+|------|-------|------------|
+| **SUPER_ADMIN** | 1 | Sistema completo, todos os restaurantes |
+| **CONSULTANT** | 1 | Onboarding, setup de restaurantes |
+| **RESTAURANT_OWNER** | 2 | Seu restaurante, staff, cardápio, pedidos |
+| **WAITER** | 3 | Pedidos, mesas, chamar cozinha |
+| **KITCHEN** | 3 | Visualizar e atualizar pedidos |
+| **CUSTOMER** | 4 | Fazer pedidos, dividir conta, pagar |
 
 ---
 
-## FEATURES CORE
+## 🔥 FEATURES CORE
 
-### Split Bill 🔥
+### Split Bill
 - Métodos: `EQUAL` | `BY_ITEM` | `CUSTOM` | `PERCENTAGE`
 - Links únicos por participante com token
 - Expiração: 24 horas
 - Rastreamento individual de pagamentos
 
+### Table Session
+- QR Code único por mesa
+- Primeiro a escanear = owner
+- Aprovação de membros
+- Comanda compartilhada
+
 ### Order Status
 `PENDING` → `CONFIRMED` → `PREPARING` → `READY` → `DELIVERED`
 (ou `CANCELLED` em qualquer etapa antes de DELIVERED)
 
-### Inventory OCR 🔥
-Upload PDF/imagem → OCR (Tesseract) → Extração de dados → Revisão → Confirmação → Entrada no estoque
-
 ### Real-time (Socket.IO)
+
 - `new-order`, `order-status-changed`
 - `payment-received`, `all-payments-complete`
+- `table-member-joined`, `table-member-left`
+
+### Customer Behavior Analytics
+
+- Rastreamento de pedidos por cliente
+- Rankings de pratos preferidos e categorias
+- Frequência de visitas e ticket médio
+- Push marketing segmentado (B2B)
+- Anúncios na plataforma (CPM/CPC)
+- **Documentação:** `docs/MONETIZATION_FEATURES.md`
+
+### TabSync Payment Gateway
+
+- Gateway de pagamentos próprio com parcerias diretas com bancos
+- PIX, Cartão de Crédito, Cartão de Débito
+- Sistema de liquidação D+1 para merchants
+- Antecipação de recebíveis (opcional)
+- Taxas negociadas menores que Stripe/MercadoPago
+- **Documentação:** `docs/MONETIZATION_FEATURES.md`
 
 ---
 
-## API - ENDPOINTS PRINCIPAIS
+## 🌐 API - ENDPOINTS
 
 ```
-POST   /api/auth/login|register|refresh
+# Auth
+POST   /api/auth/login
+POST   /api/auth/register
+POST   /api/auth/refresh
+POST   /api/auth/restaurant/login
 GET    /api/auth/profile
 
+# Restaurants
 CRUD   /api/restaurants
 GET    /api/restaurants/slug/:slug
 
-CRUD   /api/menu/categories|items
+# Menu
+CRUD   /api/menu/categories
+CRUD   /api/menu/items
 GET    /api/menu/restaurant/:id/full
 
+# Table Sessions
+POST   /api/tables/:tableId/session      # Iniciar sessão
+POST   /api/tables/session/:id/join      # Solicitar entrada
+PATCH  /api/tables/session/:id/approve   # Aprovar membro
+GET    /api/tables/session/:id           # Status da sessão
+
+# Orders
 CRUD   /api/orders
 PATCH  /api/orders/:id/status
 
-POST   /api/payments/split/:orderId     # Dividir conta
-GET    /api/payments/split/token/:token # Link pagamento
-POST   /api/payments/split/:id/process  # Processar
+# Payments
+POST   /api/payments/split/:orderId
+GET    /api/payments/split/token/:token
+POST   /api/payments/split/:id/process
 
-CRUD   /api/inventory/items|suppliers
-POST   /api/inventory/invoices/upload   # OCR
-POST   /api/inventory/invoices/:id/confirm
+# Reviews
+POST   /api/reviews
+GET    /api/reviews/restaurant/:id
+POST   /api/reviews/:id/response
+
+# Super Admin
+GET    /api/admin/metrics
+GET    /api/admin/restaurants
+GET    /api/admin/users
+CRUD   /api/admin/plans
+CRUD   /api/admin/consultants
 ```
-
-### Status Codes
-- 200 OK | 201 Created | 204 No Content
-- 400 Bad Request | 401 Unauthorized | 403 Forbidden | 404 Not Found
-- 429 Rate Limit | 500 Internal Error
 
 ---
 
-## GIT WORKFLOW
+## 📋 GIT WORKFLOW
 
 ### Branches
 - `main` → Produção | `develop` → Staging
@@ -242,13 +556,12 @@ feat|fix|docs|style|refactor|perf|test|chore(scope): descricao em portugues
 ```
 
 **⚠️ REGRAS ABSOLUTAS:**
-
 - Commits SEM assinatura Claude (sem Generated, sem Co-Authored-By)
-- Mensagens de commit SEMPRE em portugues
+- Mensagens de commit SEMPRE em português
 
 ---
 
-## TESTES
+## 🧪 TESTES
 
 | Tipo | Cobertura | Ferramenta |
 |------|-----------|------------|
@@ -260,7 +573,7 @@ Padrão **AAA**: Arrange → Act → Assert
 
 ---
 
-## PERFORMANCE - TARGETS
+## ⚡ PERFORMANCE - TARGETS
 
 | Métrica | Target |
 |---------|--------|
@@ -273,23 +586,7 @@ Padrão **AAA**: Arrange → Act → Assert
 
 ---
 
-## AGENTES ESPECIALIZADOS
-
-| Tarefa | Agentes |
-|--------|---------|
-| Frontend | `frontend-developer`, `nextjs-architecture-expert` |
-| Backend | `backend-architect`, `api-security-audit` |
-| Database | `database-architect`, `database-optimizer` |
-| Segurança | `security-auditor`, `penetration-tester` |
-| Performance | `performance-engineer`, `web-vitals-optimizer` |
-| DevOps | `devops-engineer`, `vercel-deployment-specialist` |
-| Testes | `test-automator`, `debugger` |
-| Code Review | `code-reviewer`, `unused-code-cleaner` |
-| Documentação | `api-documenter`, `technical-writer` |
-
----
-
-## CHECKLIST PRÉ-IMPLEMENTAÇÃO
+## ✅ CHECKLIST PRÉ-IMPLEMENTAÇÃO
 
 ### Segurança
 - [ ] Inputs validados (Zod)
@@ -297,16 +594,22 @@ Padrão **AAA**: Arrange → Act → Assert
 - [ ] Rate limiting
 - [ ] Sem dados sensíveis em logs
 - [ ] Valores de pagamento do backend
+- [ ] CSRF protection
+- [ ] XSS prevention
 
 ### Código
 - [ ] TypeScript strict, ZERO `any`
 - [ ] Parâmetros e retornos tipados
 - [ ] DRY, funções pequenas
+- [ ] Error handling completo
+- [ ] Código definitivo (não temporário)
 
 ### Frontend
 - [ ] Loading/Error/Empty states
 - [ ] Arrays validados
 - [ ] Real-time via Socket.IO
+- [ ] Responsivo
+- [ ] Acessibilidade (a11y)
 
 ### Git
 - [ ] Conventional Commits
@@ -314,37 +617,39 @@ Padrão **AAA**: Arrange → Act → Assert
 
 ---
 
-## COMUNICAÇÃO
+## 🌍 COMUNICAÇÃO
 
 - **Usuário/UI**: Português Brasil
 - **Código/Variáveis/Commits/Logs**: Inglês
 
 ---
 
-## LEMA
+## 💎 LEMA
 
 > **"Split the Bill, Not the Experience"**
 >
 > Segurança em pagamentos é inegociável.
 > Real-time é requisito, não feature.
 > Zero gambiarras, sempre definitivo.
+> Código FAANG desde a primeira linha.
 
 ---
 
-## URLS DE PRODUÇÃO
+## 🔗 URLS DE PRODUÇÃO
 
-| Ambiente    | URL                                                                            |
-|-------------|--------------------------------------------------------------------------------|
-| Frontend    | `https://app-restaurantes.vercel.app`                                          |
-| Backend API | `https://tabsync-backend.gentlecoast-55c82748.eastus2.azurecontainerapps.io`   |
-| Database    | Supabase PostgreSQL (aws-1-sa-east-1)                                          |
+| Ambiente | URL |
+|----------|-----|
+| Frontend | `https://app-restaurantes.vercel.app` |
+| Backend API | `https://tabsync-backend.gentlecoast-55c82748.eastus2.azurecontainerapps.io` |
+| Database | Supabase PostgreSQL (aws-1-sa-east-1) |
 
 ---
 
-## CREDENCIAIS DEV
+## 🔑 CREDENCIAIS DEV
 
 | Role | Email | Senha |
 |------|-------|-------|
-| Admin | admin@tabsync.com | admin123 |
+| Super Admin | superadmin@tabsync.com | super123 |
+| Consultant | consultor@tabsync.com | consultor123 |
 | Owner | restaurante@teste.com | teste123 |
 | Customer | cliente@teste.com | teste123 |
