@@ -23,3 +23,6 @@ node_modules/
 
 # Windows special file
 nul
+
+# Prototype folder (separate repo)
+prototipo-app-restaurantes/
