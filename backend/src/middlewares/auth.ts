@@ -55,3 +55,11 @@ export const authorize = (...allowedRoles: string[]) => {
     next();
   };
 };
+
+// Alias for authorize middleware
+export const requireRole = (allowedRoles: string[]) => authorize(...allowedRoles);
+
+// Type for authenticated requests
+export interface AuthRequest extends Request {
+  user: JwtPayload;
+}

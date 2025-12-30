@@ -12,6 +12,9 @@ import menuRoutes from './modules/menu/menu.routes';
 import ordersRoutes from './modules/orders/orders.routes';
 import paymentsRoutes from './modules/payments/payments.routes';
 import inventoryRoutes from './modules/inventory/inventory.routes';
+import tablesRoutes from './modules/tables/tables.routes';
+import reviewsRoutes from './modules/reviews/reviews.routes';
+import adminRoutes from './modules/admin/admin.routes';
 
 // Load environment variables
 dotenv.config();
@@ -64,6 +67,12 @@ app.get('/api', (_req: Request, res: Response) => {
       orders: '/api/orders',
       payments: '/api/payments',
       inventory: '/api/inventory',
+      tables: '/api/tables',
+      reviews: '/api/reviews',
+      suggestions: '/api/suggestions',
+      complaints: '/api/complaints',
+      nps: '/api/nps',
+      admin: '/api/admin',
     },
   });
 });
@@ -75,6 +84,9 @@ app.use('/api/menu', menuRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/tables', tablesRoutes);
+app.use('/api', reviewsRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {
