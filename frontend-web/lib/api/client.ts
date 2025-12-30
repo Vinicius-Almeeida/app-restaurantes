@@ -1,6 +1,27 @@
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+
+/**
+ * Get auth tokens from Zustand store
+ * NOTE: These functions will be set by the auth store
+ */
+let getAccessTokenFromStore: (() => string | null) | null = null;
+let getRefreshTokenFromStore: (() => string | null) | null = null;
+let updateTokensInStore: ((accessToken: string, refreshToken: string) => void) | null = null;
+let clearAuthInStore: (() => void) | null = null;
+
+export function setAuthStoreHooks(
+  getAccessToken: () => string | null,
+  getRefreshToken: () => string | null,
+  updateTokens: (accessToken: string, refreshToken: string) => void,
+  clearAuth: () => void
+) {
+  getAccessTokenFromStore = getAccessToken;
+  getRefreshTokenFromStore = getRefreshToken;
+  updateTokensInStore = updateTokens;
+  clearAuthInStore = clearAuth;
+}
 
 class ApiClient {
   private client: AxiosInstance;
@@ -13,12 +34,12 @@ class ApiClient {
       },
     });
 
-    // Request interceptor - add auth token
+    // Request interceptor - add auth token from Zustand store
     this.client.interceptors.request.use(
-      (config) => {
-        if (typeof window !== 'undefined') {
-          const token = localStorage.getItem('accessToken');
-          if (token) {
+      (config: InternalAxiosRequestConfig) => {
+        if (typeof window !== 'undefined' && getTokenFromStore) {
+          const token = getTokenFromStore();
+          if (token && config.headers) {
             config.headers.Authorization = `Bearer ${token}`;
           }
         }
@@ -27,34 +48,44 @@ class ApiClient {
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor - handle errors
+    // Response interceptor - handle token refresh
     this.client.interceptors.response.use(
       (response) => response,
       async (error) => {
         if (error.response?.status === 401) {
-          // Try to refresh token
-          const refreshToken = localStorage.getItem('refreshToken');
-          if (refreshToken) {
-            try {
-              const response = await axios.post(`${API_URL}/auth/refresh`, {
-                refreshToken,
-              });
+          // Try to refresh token from Zustand store
+          if (getTokenFromStore && updateTokensInStore && clearAuthInStore) {
+            const refreshToken = getTokenFromStore(); // In real implementation, get from separate getter
 
-              const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-              localStorage.setItem('accessToken', accessToken);
-              localStorage.setItem('refreshToken', newRefreshToken);
+            if (refreshToken) {
+              try {
+                const response = await axios.post(`${API_URL}/auth/refresh`, {
+                  refreshToken,
+                });
 
-              // Retry original request
-              error.config.headers.Authorization = `Bearer ${accessToken}`;
-              return this.client.request(error.config);
-            } catch (refreshError) {
-              // Refresh failed, logout
-              localStorage.removeItem('accessToken');
-              localStorage.removeItem('refreshToken');
-              window.location.href = '/login';
+                const { accessToken, refreshToken: newRefreshToken } = response.data.data;
+
+                // Update tokens in Zustand store
+                updateTokensInStore(accessToken, newRefreshToken);
+
+                // Retry original request with new token
+                if (error.config.headers) {
+                  error.config.headers.Authorization = `Bearer ${accessToken}`;
+                }
+                return this.client.request(error.config);
+              } catch (refreshError) {
+                // Refresh failed, clear auth and redirect
+                clearAuthInStore();
+                if (typeof window !== 'undefined') {
+                  window.location.href = '/login';
+                }
+              }
+            } else {
+              // No refresh token, redirect to login
+              if (typeof window !== 'undefined') {
+                window.location.href = '/login';
+              }
             }
-          } else {
-            window.location.href = '/login';
           }
         }
         return Promise.reject(error);
