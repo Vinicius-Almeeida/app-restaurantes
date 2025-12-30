@@ -116,3 +116,6 @@ export interface Payment {
   status: PaymentStatus;
   createdAt: string;
 }
+
+// Re-export table session types
+export * from './table-session';
