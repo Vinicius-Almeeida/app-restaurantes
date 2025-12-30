@@ -157,7 +157,7 @@ export function useOrderSocket(options: UseOrderSocketOptions = {}) {
    */
   const addItemToOrder = useCallback((
     orderId: string,
-    itemData: unknown
+    itemData: Record<string, unknown>
   ) => {
     socket?.emit('add-order-item', { orderId, ...itemData });
   }, [socket]);

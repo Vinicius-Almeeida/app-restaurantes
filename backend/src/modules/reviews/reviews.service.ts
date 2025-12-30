@@ -85,7 +85,23 @@ export class ReviewsService {
 
     return prisma.suggestion.findMany({
       where: { restaurantId },
+      include: { user: { select: { id: true, fullName: true, email: true } } },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async markSuggestionAsRead(suggestionId: string, userId: string) {
+    const suggestion = await prisma.suggestion.findUnique({
+      where: { id: suggestionId },
+      include: { restaurant: true },
+    });
+
+    if (!suggestion) throw new AppError(404, 'Suggestion not found');
+    if (suggestion.restaurant.ownerId !== userId) throw new AppError(403, 'Access denied');
+
+    return prisma.suggestion.update({
+      where: { id: suggestionId },
+      data: { status: 'READ' },
     });
   }
 
@@ -181,5 +197,43 @@ export class ReviewsService {
     const nps = Math.round(((promoters - detractors) / responses.length) * 100);
 
     return { score: nps, total: responses.length, breakdown: { promoters, passives, detractors } };
+  }
+
+  async getNpsResponses(restaurantId: string, userId: string) {
+    const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId } });
+    if (!restaurant || restaurant.ownerId !== userId) throw new AppError(403, 'Access denied');
+
+    return prisma.npsResponse.findMany({
+      where: { restaurantId },
+      include: {
+        user: { select: { id: true, fullName: true, email: true } },
+        tableSession: { select: { id: true, startedAt: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getMyReviews(userId: string) {
+    return prisma.review.findMany({
+      where: { userId },
+      include: {
+        restaurant: { select: { id: true, name: true, slug: true, logoUrl: true } },
+        tableSession: { select: { id: true, startedAt: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getReviewById(reviewId: string) {
+    const review = await prisma.review.findUnique({
+      where: { id: reviewId },
+      include: {
+        user: { select: { id: true, fullName: true, avatarUrl: true } },
+        restaurant: { select: { id: true, name: true, slug: true } },
+      },
+    });
+
+    if (!review) throw new AppError(404, 'Review not found');
+    return review;
   }
 }

@@ -138,6 +138,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 if (typeof window !== 'undefined') {
   setAuthStoreHooks(
     () => useAuthStore.getState().getAccessToken(),
+    () => useAuthStore.getState().getRefreshToken(),
     (accessToken: string, refreshToken: string) => useAuthStore.getState().updateTokens(accessToken, refreshToken),
     () => useAuthStore.getState().logout()
   );

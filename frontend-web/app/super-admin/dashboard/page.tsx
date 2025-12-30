@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -12,6 +12,7 @@ import {
   ShoppingCart,
   AlertTriangle,
   Headphones,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { ProtectedRoute } from '@/components/auth';
@@ -22,15 +23,23 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { SuperAdminSidebar } from '../components/sidebar';
 import { MetricsCard } from '../components/metrics-card';
+import {
+  adminApi,
+  type AdminMetrics as ApiAdminMetrics,
+  type EscalatedComplaint as ApiEscalatedComplaint,
+  type Restaurant,
+  type Plan,
+} from '@/lib/api/admin';
 
-// Types
-interface AdminMetrics {
+// Types for display
+interface DisplayMetrics {
   mrr: number;
   arr: number;
   totalRestaurants: number;
   totalUsers: number;
   churnRate: number;
   gmv: number;
+  newRestaurants: number;
 }
 
 interface RecentRestaurant {
@@ -74,120 +83,132 @@ const statusColors = {
 function SuperAdminDashboardContent() {
   const router = useRouter();
   const { logout } = useAuthStore();
-  const [metrics, setMetrics] = useState<AdminMetrics>({
+  const [metrics, setMetrics] = useState<DisplayMetrics>({
     mrr: 0,
     arr: 0,
     totalRestaurants: 0,
     totalUsers: 0,
     churnRate: 0,
     gmv: 0,
+    newRestaurants: 0,
   });
   const [recentRestaurants, setRecentRestaurants] = useState<RecentRestaurant[]>([]);
   const [escalatedComplaints, setEscalatedComplaints] = useState<EscalatedComplaint[]>([]);
   const [planDistribution, setPlanDistribution] = useState<PlanDistribution[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async (showRefreshToast = false) => {
     try {
-      // TODO: Replace with actual API endpoints when backend is ready
-      // Mock data for demonstration
+      if (showRefreshToast) {
+        setIsRefreshing(true);
+      }
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Fetch all data in parallel from the real API
+      const [metricsData, restaurantsData, complaintsData, plansData, subscriptionsData] = await Promise.all([
+        adminApi.getDashboardMetrics('30d'),
+        adminApi.listRestaurants({ page: 1, limit: 5 }),
+        adminApi.getEscalatedComplaints(),
+        adminApi.listPlans(),
+        adminApi.listSubscriptions({ page: 1, limit: 1000 }),
+      ]);
 
-      // Mock metrics
+      // Transform metrics for display
+      const totalRestaurants = Array.isArray(metricsData.totalRestaurants)
+        ? metricsData.totalRestaurants.reduce((sum, item) => sum + item._count, 0)
+        : 0;
+
+      const totalUsers = Array.isArray(metricsData.totalUsers)
+        ? metricsData.totalUsers.reduce((sum, item) => sum + item._count, 0)
+        : 0;
+
+      // Calculate churn rate
+      const activeSubscriptions = subscriptionsData.subscriptions.filter(
+        (s) => s.status === 'ACTIVE'
+      ).length;
+      const churnRate = activeSubscriptions > 0
+        ? (metricsData.churnedSubscriptions / activeSubscriptions) * 100
+        : 0;
+
       setMetrics({
-        mrr: 45230.50,
-        arr: 542766.00,
-        totalRestaurants: 127,
-        totalUsers: 1543,
-        churnRate: 2.3,
-        gmv: 1250000.00,
+        mrr: metricsData.mrr || 0,
+        arr: metricsData.arr || 0,
+        totalRestaurants,
+        totalUsers,
+        churnRate,
+        gmv: Number(metricsData.gmv) || 0,
+        newRestaurants: metricsData.newRestaurants || 0,
       });
 
-      // Mock recent restaurants
-      setRecentRestaurants([
-        {
-          id: '1',
-          name: 'Pizzaria Bella Napoli',
-          slug: 'pizzaria-bella-napoli',
-          ownerName: 'João Silva',
-          createdAt: new Date().toISOString(),
-          status: 'ACTIVE',
-        },
-        {
-          id: '2',
-          name: 'Sushi House Premium',
-          slug: 'sushi-house-premium',
-          ownerName: 'Maria Santos',
-          createdAt: new Date(Date.now() - 86400000).toISOString(),
-          status: 'ACTIVE',
-        },
-        {
-          id: '3',
-          name: 'Burger & Beer',
-          slug: 'burger-beer',
-          ownerName: 'Carlos Oliveira',
-          createdAt: new Date(Date.now() - 172800000).toISOString(),
-          status: 'INACTIVE',
-        },
-      ]);
+      // Transform restaurants for display
+      const transformedRestaurants: RecentRestaurant[] = restaurantsData.restaurants.map(
+        (restaurant: Restaurant) => ({
+          id: restaurant.id,
+          name: restaurant.name,
+          slug: restaurant.slug,
+          ownerName: restaurant.owner.fullName,
+          createdAt: restaurant.createdAt,
+          status: restaurant.isActive ? 'ACTIVE' : 'INACTIVE',
+        })
+      );
+      setRecentRestaurants(transformedRestaurants);
 
-      // Mock escalated complaints
-      setEscalatedComplaints([
-        {
-          id: '1',
-          restaurantName: 'Restaurante Dom Pedro',
-          issueType: 'Pagamento não processado',
-          priority: 'CRITICAL',
-          createdAt: new Date().toISOString(),
-          status: 'OPEN',
-        },
-        {
-          id: '2',
-          restaurantName: 'Cantina Italiana',
-          issueType: 'Sistema lento',
-          priority: 'MEDIUM',
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-          status: 'IN_PROGRESS',
-        },
-      ]);
+      // Transform complaints for display
+      const transformedComplaints: EscalatedComplaint[] = complaintsData.slice(0, 5).map(
+        (complaint: ApiEscalatedComplaint) => ({
+          id: complaint.id,
+          restaurantName: complaint.restaurant.name,
+          issueType: complaint.category,
+          priority: complaint.priority,
+          createdAt: complaint.createdAt,
+          status: complaint.status === 'CLOSED' ? 'RESOLVED' : complaint.status,
+        })
+      );
+      setEscalatedComplaints(transformedComplaints);
 
-      // Mock plan distribution
-      setPlanDistribution([
-        { plan: 'Básico', count: 45, percentage: 35.4 },
-        { plan: 'Pro', count: 58, percentage: 45.7 },
-        { plan: 'Enterprise', count: 24, percentage: 18.9 },
-      ]);
+      // Calculate plan distribution
+      const planCounts: Record<string, number> = {};
+      subscriptionsData.subscriptions.forEach((sub) => {
+        const planName = sub.plan.name;
+        planCounts[planName] = (planCounts[planName] || 0) + 1;
+      });
 
-      // Uncomment when API is ready:
-      // const [metricsRes, restaurantsRes, complaintsRes, plansRes] = await Promise.all([
-      //   apiClient.get<{ data: AdminMetrics }>('/super-admin/metrics'),
-      //   apiClient.get<{ data: RecentRestaurant[] }>('/super-admin/restaurants/recent'),
-      //   apiClient.get<{ data: EscalatedComplaint[] }>('/super-admin/support/escalated'),
-      //   apiClient.get<{ data: PlanDistribution[] }>('/super-admin/plans/distribution'),
-      // ]);
-      //
-      // setMetrics(metricsRes.data.data);
-      // setRecentRestaurants(restaurantsRes.data.data);
-      // setEscalatedComplaints(complaintsRes.data.data);
-      // setPlanDistribution(plansRes.data.data);
+      const totalSubs = subscriptionsData.subscriptions.length || 1;
+      const distribution: PlanDistribution[] = plansData
+        .filter((plan: Plan) => plan.isActive)
+        .map((plan: Plan) => ({
+          plan: plan.name,
+          count: planCounts[plan.name] || 0,
+          percentage: ((planCounts[plan.name] || 0) / totalSubs) * 100,
+        }));
+      setPlanDistribution(distribution);
 
+      if (showRefreshToast) {
+        toast.success('Dashboard atualizado');
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Erro ao carregar dados do dashboard');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+    // Refresh every 5 minutes
+    const interval = setInterval(() => fetchDashboardData(), 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [fetchDashboardData]);
 
   const handleLogout = () => {
     logout();
-    router.push('/auth/login');
+    router.push('/super-admin/login');
+  };
+
+  const handleRefresh = () => {
+    fetchDashboardData(true);
   };
 
   const formatPrice = (value: number): string => {
@@ -223,13 +244,25 @@ function SuperAdminDashboardContent() {
       {/* Main Content */}
       <main className="flex-1 p-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Dashboard - Super Admin
-          </h1>
-          <p className="text-gray-600">
-            Visão geral da plataforma TabSync
-          </p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Dashboard - Super Admin
+            </h1>
+            <p className="text-gray-600">
+              Visão geral da plataforma TabSync
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
         </div>
 
         {/* Metrics Grid */}
@@ -250,13 +283,13 @@ function SuperAdminDashboardContent() {
             title="GMV (Volume Transacionado)"
             value={formatPrice(metrics.gmv)}
             icon={ShoppingCart}
-            description="Último mês"
+            description="Últimos 30 dias"
           />
           <MetricsCard
             title="Total de Restaurantes"
             value={metrics.totalRestaurants}
             icon={Store}
-            trend={{ value: 5.2, isPositive: true }}
+            description={`+${metrics.newRestaurants} novos`}
           />
           <MetricsCard
             title="Total de Usuários"
@@ -268,7 +301,7 @@ function SuperAdminDashboardContent() {
             title="Taxa de Churn"
             value={formatPercentage(metrics.churnRate)}
             icon={UserMinus}
-            trend={{ value: 0.5, isPositive: false }}
+            trend={{ value: metrics.churnRate, isPositive: metrics.churnRate < 5 }}
             className="border-orange-200"
           />
         </div>
@@ -384,24 +417,30 @@ function SuperAdminDashboardContent() {
             <CardTitle>Distribuição de Planos</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {planDistribution.map((plan) => (
-                <div key={plan.plan} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-gray-900">{plan.plan}</span>
-                    <span className="text-gray-600">
-                      {plan.count} restaurantes ({formatPercentage(plan.percentage)})
-                    </span>
+            {planDistribution.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>Nenhum plano configurado</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {planDistribution.map((plan) => (
+                  <div key={plan.plan} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-gray-900">{plan.plan}</span>
+                      <span className="text-gray-600">
+                        {plan.count} restaurantes ({formatPercentage(plan.percentage)})
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-orange-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(plan.percentage, 100)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-orange-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${plan.percentage}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>
@@ -411,7 +450,7 @@ function SuperAdminDashboardContent() {
 
 export default function SuperAdminDashboardPage() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN']}>
+    <ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
       <SuperAdminDashboardContent />
     </ProtectedRoute>
   );

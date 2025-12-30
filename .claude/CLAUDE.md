@@ -1,5 +1,34 @@
 # TabSync - Diretrizes de Desenvolvimento
 
+## ⚠️ AMBIENTE DE DESENVOLVIMENTO - WINDOWS
+
+> **CRÍTICO**: Este projeto é desenvolvido em **Windows**. Todos os agentes DEVEM seguir estas regras:
+
+### Comandos Proibidos no Windows
+| ❌ NÃO USAR | ✅ ALTERNATIVA |
+|-------------|----------------|
+| `mkdir -p` | Use a ferramenta **Write** para criar arquivos (cria diretórios automaticamente) |
+| `rm -rf` | Use `rmdir /s /q` ou delete arquivos individualmente |
+| `touch` | Use a ferramenta **Write** |
+| `cat` | Use a ferramenta **Read** |
+| `grep` | Use a ferramenta **Grep** |
+| `find` | Use a ferramenta **Glob** |
+| `ls` | Use `dir` ou a ferramenta **Bash** com `ls` (Git Bash) |
+| `cp -r` | Use `xcopy /E /I` |
+
+### Regra de Ouro para Criar Arquivos
+**NUNCA use Bash para criar diretórios ou arquivos**. Use SEMPRE as ferramentas:
+- `Write` → Cria arquivo (e diretórios pai automaticamente)
+- `Edit` → Edita arquivo existente
+- `Read` → Lê arquivo
+
+### Se um comando Bash falhar
+1. **NÃO repita o mesmo comando** - isso causa loop infinito
+2. **Use ferramentas nativas** (Write, Read, Edit, Glob, Grep)
+3. **Adapte para Windows** se precisar de Bash
+
+---
+
 ## MISSÃO
 
 **TabSync** - Plataforma SaaS multi-tenant para gestão de pedidos e pagamentos em restaurantes com **divisão inteligente de contas (Split Bill)**.

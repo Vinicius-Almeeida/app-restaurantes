@@ -1,14 +1,25 @@
+// User roles - all 6 roles in the multi-tenant system
+export type UserRole =
+  | 'SUPER_ADMIN'      // Platform owners
+  | 'CONSULTANT'       // Onboarding consultants
+  | 'RESTAURANT_OWNER' // Restaurant admin
+  | 'WAITER'           // Waiter staff
+  | 'KITCHEN'          // Kitchen staff
+  | 'CUSTOMER'         // End customer
+  | 'ADMIN';           // Legacy/alias for SUPER_ADMIN
+
 // User types
 export interface User {
   id: string;
   email: string;
   fullName: string;
   phone?: string;
-  role: 'CUSTOMER' | 'RESTAURANT_OWNER' | 'ADMIN';
+  role: UserRole;
   avatarUrl?: string;
   emailVerified: boolean;
   createdAt: string;
   updatedAt: string;
+  restaurantId?: string; // For staff members
 }
 
 export interface AuthResponse {

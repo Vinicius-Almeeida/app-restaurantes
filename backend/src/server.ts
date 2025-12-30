@@ -15,6 +15,8 @@ import inventoryRoutes from './modules/inventory/inventory.routes';
 import tablesRoutes from './modules/tables/tables.routes';
 import reviewsRoutes from './modules/reviews/reviews.routes';
 import adminRoutes from './modules/admin/admin.routes';
+import kitchenRoutes from './modules/kitchen/kitchen.routes';
+import waiterRoutes from './modules/waiter/waiter.routes';
 
 // Load environment variables
 dotenv.config();
@@ -73,6 +75,8 @@ app.get('/api', (_req: Request, res: Response) => {
       complaints: '/api/complaints',
       nps: '/api/nps',
       admin: '/api/admin',
+      kitchen: '/api/kitchen',
+      waiter: '/api/waiter',
     },
   });
 });
@@ -87,6 +91,8 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/tables', tablesRoutes);
 app.use('/api', reviewsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/kitchen', kitchenRoutes);
+app.use('/api/waiter', waiterRoutes);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {

@@ -37,8 +37,8 @@ class ApiClient {
     // Request interceptor - add auth token from Zustand store
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        if (typeof window !== 'undefined' && getTokenFromStore) {
-          const token = getTokenFromStore();
+        if (typeof window !== 'undefined' && getAccessTokenFromStore) {
+          const token = getAccessTokenFromStore();
           if (token && config.headers) {
             config.headers.Authorization = `Bearer ${token}`;
           }
@@ -54,8 +54,8 @@ class ApiClient {
       async (error) => {
         if (error.response?.status === 401) {
           // Try to refresh token from Zustand store
-          if (getTokenFromStore && updateTokensInStore && clearAuthInStore) {
-            const refreshToken = getTokenFromStore(); // In real implementation, get from separate getter
+          if (getRefreshTokenFromStore && updateTokensInStore && clearAuthInStore) {
+            const refreshToken = getRefreshTokenFromStore();
 
             if (refreshToken) {
               try {
