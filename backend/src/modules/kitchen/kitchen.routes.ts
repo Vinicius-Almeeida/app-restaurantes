@@ -5,15 +5,15 @@
 
 import { Router } from 'express';
 import { kitchenController } from './kitchen.controller';
-import { authenticate, authorizeRoles } from '../../middlewares/auth';
+import { authenticate, authorize } from '../../middlewares/auth';
 
 const router = Router();
 
 // All kitchen routes require authentication
 router.use(authenticate);
 
-// Only KITCHEN staff, MANAGER, RESTAURANT_OWNER, and ADMIN can access
-const authorizedRoles = authorizeRoles(['KITCHEN', 'RESTAURANT_OWNER', 'ADMIN']);
+// Only KITCHEN staff, RESTAURANT_OWNER, and SUPER_ADMIN can access
+const authorizedRoles = authorize('KITCHEN', 'RESTAURANT_OWNER', 'SUPER_ADMIN');
 
 /**
  * @route   GET /api/kitchen/:restaurantId/orders

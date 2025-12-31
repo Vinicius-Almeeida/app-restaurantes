@@ -23,7 +23,7 @@ export class KitchenController {
   async getActiveOrders(req: Request, res: Response, next: NextFunction) {
     try {
       const { restaurantId } = restaurantIdParamSchema.parse(req.params);
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const orders = await kitchenService.getActiveOrders(userId, restaurantId);
 
@@ -44,7 +44,7 @@ export class KitchenController {
     try {
       const { restaurantId } = restaurantIdParamSchema.parse(req.params);
       const query = getOrdersQuerySchema.parse(req.query);
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const result = await kitchenService.getOrdersByStatus(userId, restaurantId, query);
 
@@ -71,7 +71,7 @@ export class KitchenController {
     try {
       const { restaurantId } = restaurantIdParamSchema.parse({ restaurantId: req.params.restaurantId });
       const { orderId } = orderIdParamSchema.parse({ orderId: req.params.orderId });
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const order = await kitchenService.getOrderById(userId, restaurantId, orderId);
 
@@ -91,7 +91,7 @@ export class KitchenController {
   async getStats(req: Request, res: Response, next: NextFunction) {
     try {
       const { restaurantId } = restaurantIdParamSchema.parse(req.params);
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       // Verify access first
       await kitchenService.getActiveOrders(userId, restaurantId);
@@ -114,7 +114,7 @@ export class KitchenController {
     try {
       const { restaurantId } = restaurantIdParamSchema.parse({ restaurantId: req.params.restaurantId });
       const { orderId } = orderIdParamSchema.parse({ orderId: req.params.orderId });
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const order = await kitchenService.confirmOrder(userId, restaurantId, orderId);
 
@@ -137,7 +137,7 @@ export class KitchenController {
       const { restaurantId } = restaurantIdParamSchema.parse({ restaurantId: req.params.restaurantId });
       const { orderId } = orderIdParamSchema.parse({ orderId: req.params.orderId });
       const data = startOrderSchema.parse(req.body);
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const order = await kitchenService.startOrder(userId, restaurantId, orderId, data);
 
@@ -160,7 +160,7 @@ export class KitchenController {
       const { restaurantId } = restaurantIdParamSchema.parse({ restaurantId: req.params.restaurantId });
       const { orderId } = orderIdParamSchema.parse({ orderId: req.params.orderId });
       const data = markOrderReadySchema.parse(req.body);
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const order = await kitchenService.markOrderReady(userId, restaurantId, orderId, data);
 
@@ -183,7 +183,7 @@ export class KitchenController {
       const { restaurantId } = restaurantIdParamSchema.parse({ restaurantId: req.params.restaurantId });
       const { orderId } = orderIdParamSchema.parse({ orderId: req.params.orderId });
       const { reason } = req.body;
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const order = await kitchenService.cancelOrder(userId, restaurantId, orderId, reason);
 

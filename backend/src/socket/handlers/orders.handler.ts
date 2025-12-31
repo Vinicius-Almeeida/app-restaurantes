@@ -117,7 +117,7 @@ export const emitOrderStatusChanged = async (
         restaurantId: true,
         tableSessionId: true,
         tableNumber: true,
-        updatedAt: true,
+        createdAt: true,
       },
     });
 
@@ -132,7 +132,7 @@ export const emitOrderStatusChanged = async (
       restaurantId: order.restaurantId,
       oldStatus,
       newStatus,
-      updatedAt: order.updatedAt.toISOString(),
+      updatedAt: new Date().toISOString(),
       tableNumber: order.tableNumber,
     };
 

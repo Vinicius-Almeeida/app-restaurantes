@@ -5,7 +5,7 @@
 
 import { Router } from 'express';
 import { waiterController } from './waiter.controller';
-import { authenticate, authorizeRoles } from '../../middlewares/auth';
+import { authenticate, authorize } from '../../middlewares/auth';
 
 const router = Router();
 
@@ -13,10 +13,10 @@ const router = Router();
 router.use(authenticate);
 
 // Waiter staff, managers, and owners can access
-const staffRoles = authorizeRoles(['WAITER', 'RESTAURANT_OWNER', 'ADMIN']);
+const staffRoles = authorize('WAITER', 'RESTAURANT_OWNER', 'SUPER_ADMIN');
 
 // Customers can call waiter
-const customerRoles = authorizeRoles(['CUSTOMER', 'WAITER', 'RESTAURANT_OWNER', 'ADMIN']);
+const customerRoles = authorize('CUSTOMER', 'WAITER', 'RESTAURANT_OWNER', 'SUPER_ADMIN');
 
 /**
  * @route   GET /api/waiter/:restaurantId/dashboard

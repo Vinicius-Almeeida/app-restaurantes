@@ -41,7 +41,7 @@ export class KitchenService {
         restaurantId,
         userId,
         isActive: true,
-        role: { in: ['KITCHEN', 'MANAGER'] },
+        role: { in: ['KITCHEN', 'WAITER'] },
       },
     });
 

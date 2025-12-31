@@ -38,7 +38,7 @@ export class WaiterService {
         restaurantId,
         userId,
         isActive: true,
-        role: { in: ['WAITER', 'MANAGER'] },
+        role: { in: ['WAITER', 'KITCHEN'] },
       },
     });
 
@@ -207,7 +207,7 @@ export class WaiterService {
         quantity: item.quantity,
       })),
       totalItems: order.orderItems.reduce((sum, item) => sum + item.quantity, 0),
-      readyAt: order.readyAt?.toISOString() || order.updatedAt.toISOString(),
+      readyAt: order.readyAt?.toISOString() || order.createdAt.toISOString(),
       customerName: order.participants[0]?.user?.fullName || null,
     }));
   }
@@ -271,7 +271,7 @@ export class WaiterService {
         quantity: item.quantity,
       })),
       totalItems: updatedOrder.orderItems.reduce((sum, item) => sum + item.quantity, 0),
-      readyAt: updatedOrder.readyAt?.toISOString() || updatedOrder.updatedAt.toISOString(),
+      readyAt: updatedOrder.readyAt?.toISOString() || updatedOrder.createdAt.toISOString(),
       customerName: updatedOrder.participants[0]?.user?.fullName || null,
     };
   }

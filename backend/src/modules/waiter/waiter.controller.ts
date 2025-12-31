@@ -24,7 +24,7 @@ export class WaiterController {
   async getDashboard(req: Request, res: Response, next: NextFunction) {
     try {
       const { restaurantId } = restaurantIdParamSchema.parse(req.params);
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const dashboard = await waiterService.getDashboard(userId, restaurantId);
 
@@ -45,7 +45,7 @@ export class WaiterController {
     try {
       const { restaurantId } = restaurantIdParamSchema.parse(req.params);
       const query = getTablesQuerySchema.parse(req.query);
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const tables = await waiterService.getTables(userId, restaurantId, query);
 
@@ -65,7 +65,7 @@ export class WaiterController {
   async getReadyOrders(req: Request, res: Response, next: NextFunction) {
     try {
       const { restaurantId } = restaurantIdParamSchema.parse(req.params);
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       // Verify access
       await waiterService.getDashboard(userId, restaurantId);
@@ -88,7 +88,7 @@ export class WaiterController {
     try {
       const { restaurantId } = restaurantIdParamSchema.parse({ restaurantId: req.params.restaurantId });
       const { orderId } = orderIdParamSchema.parse({ orderId: req.params.orderId });
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const order = await waiterService.deliverOrder(userId, restaurantId, orderId);
 
@@ -110,7 +110,7 @@ export class WaiterController {
     try {
       const { restaurantId } = restaurantIdParamSchema.parse(req.params);
       const query = getCallsQuerySchema.parse(req.query);
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const result = await waiterService.getCalls(userId, restaurantId, query);
 
@@ -137,7 +137,7 @@ export class WaiterController {
     try {
       const { restaurantId } = restaurantIdParamSchema.parse(req.params);
       const data = createWaiterCallSchema.parse(req.body);
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const call = await waiterService.createCall(userId, restaurantId, data);
 
@@ -159,7 +159,7 @@ export class WaiterController {
     try {
       const { restaurantId } = restaurantIdParamSchema.parse({ restaurantId: req.params.restaurantId });
       const { callId } = callIdParamSchema.parse({ callId: req.params.callId });
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const call = await waiterService.acknowledgeCall(userId, restaurantId, callId);
 
@@ -181,7 +181,7 @@ export class WaiterController {
     try {
       const { restaurantId } = restaurantIdParamSchema.parse({ restaurantId: req.params.restaurantId });
       const { callId } = callIdParamSchema.parse({ callId: req.params.callId });
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const call = await waiterService.completeCall(userId, restaurantId, callId);
 
@@ -202,7 +202,7 @@ export class WaiterController {
   async getStats(req: Request, res: Response, next: NextFunction) {
     try {
       const { restaurantId } = restaurantIdParamSchema.parse(req.params);
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       // Verify access
       await waiterService.getDashboard(userId, restaurantId);
