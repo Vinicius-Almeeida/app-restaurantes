@@ -3,6 +3,12 @@ import { apiClient, setAuthStoreHooks } from '../api/client';
 import { socketManager } from '../socket';
 import type { User, AuthResponse } from '../types';
 
+/**
+ * Login context type - defines which login portal is being used
+ * This is validated by the backend for role isolation
+ */
+export type LoginContext = 'customer' | 'restaurant' | 'admin';
+
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
@@ -11,7 +17,7 @@ interface AuthState {
   refreshToken: string | null;
 
   // Actions
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, context?: LoginContext) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<void>;
@@ -35,11 +41,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   accessToken: null,
   refreshToken: null,
 
-  login: async (email: string, password: string) => {
+  /**
+   * Login with context-aware role validation
+   *
+   * @param email - User email
+   * @param password - User password
+   * @param context - Login context for role validation (customer, restaurant, admin)
+   *
+   * SECURITY: The context is validated by the backend to ensure users
+   * can only login from their designated portal
+   */
+  login: async (email: string, password: string, context: LoginContext = 'customer') => {
     try {
-      const response = await apiClient.post<{ data: AuthResponse }>('/auth/login', {
+      // Use context-aware login endpoint for role isolation
+      const response = await apiClient.post<{ data: AuthResponse }>('/auth/login/context', {
         email,
         password,
+        context,
       });
 
       const { user, accessToken, refreshToken } = response.data.data;

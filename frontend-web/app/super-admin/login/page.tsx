@@ -52,21 +52,15 @@ export default function SuperAdminLoginPage() {
   const onSubmit = async (data: SuperAdminLoginFormData) => {
     setIsLoading(true);
     try {
-      await login(data.email, data.password);
+      // SECURITY: Login with 'admin' context - backend validates role
+      // Only SUPER_ADMIN, CONSULTANT roles can login through this portal
+      await login(data.email, data.password, 'admin');
 
-      const currentUser = useAuthStore.getState().user;
-
-      // Validate SUPER_ADMIN or CONSULTANT role
-      if (!currentUser || (currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'CONSULTANT')) {
-        useAuthStore.getState().logout();
-        toast.error('Acesso negado. Credenciais de administrador inválidas.');
-        return;
-      }
-
-      // 2FA validation placeholder
+      // 2FA validation placeholder - will be implemented with proper TOTP
       if (data.twoFactorCode && data.twoFactorCode !== '000000') {
-        // TODO: Implement actual 2FA verification
-        toast.error('Código 2FA inválido');
+        // Logout if 2FA fails
+        useAuthStore.getState().logout();
+        toast.error('Codigo 2FA invalido');
         return;
       }
 
@@ -74,10 +68,20 @@ export default function SuperAdminLoginPage() {
       router.push('/super-admin/dashboard');
     } catch (error: unknown) {
       console.error('Super Admin login error:', error);
-      const errorMessage = error instanceof Error && 'response' in error
-        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
-        : 'Erro ao fazer login. Verifique suas credenciais.';
-      toast.error(errorMessage || 'Acesso negado. Credenciais inválidas.');
+
+      // Extract error message from response
+      const axiosError = error as { response?: { status?: number; data?: { message?: string } } };
+      const statusCode = axiosError.response?.status;
+      const errorMessage = axiosError.response?.data?.message;
+
+      // Handle role isolation error (403)
+      // Generic message to avoid information leakage
+      if (statusCode === 403) {
+        toast.error('Credenciais invalidas ou acesso negado.');
+        return;
+      }
+
+      toast.error(errorMessage || 'Credenciais invalidas ou acesso negado.');
     } finally {
       setIsLoading(false);
     }

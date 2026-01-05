@@ -37,19 +37,27 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
-      await login(data.email, data.password);
-      toast.success('Login realizado com sucesso!');
+      // SECURITY: Login with 'customer' context - backend validates role
+      // Only CUSTOMER role users can login through this portal
+      await login(data.email, data.password, 'customer');
 
-      // Redirect based on user role
-      const currentUser = useAuthStore.getState().user;
-      if (currentUser?.role === 'RESTAURANT_OWNER') {
-        router.push('/dashboard');
-      } else {
-        router.push('/restaurants');
-      }
-    } catch (error: any) {
+      toast.success('Login realizado com sucesso!');
+      router.push('/restaurants');
+    } catch (error: unknown) {
       console.error('Login error:', error);
-      toast.error(error.response?.data?.message || 'Erro ao fazer login. Verifique suas credenciais.');
+
+      // Extract error message from response
+      const axiosError = error as { response?: { status?: number; data?: { message?: string } } };
+      const statusCode = axiosError.response?.status;
+      const errorMessage = axiosError.response?.data?.message;
+
+      // Handle role isolation error (403)
+      if (statusCode === 403) {
+        toast.error('Acesso negado. Esta area e exclusiva para clientes.');
+        return;
+      }
+
+      toast.error(errorMessage || 'Erro ao fazer login. Verifique suas credenciais.');
     } finally {
       setIsLoading(false);
     }

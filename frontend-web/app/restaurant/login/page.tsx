@@ -41,23 +41,23 @@ export default function RestaurantLoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
-      await login(data.email, data.password);
+      // SECURITY: Login with 'restaurant' context - backend validates role
+      // Only RESTAURANT_OWNER, WAITER, KITCHEN roles can login through this portal
+      await login(data.email, data.password, 'restaurant');
 
-      // Store remember me preference
+      // Get user after successful login
+      const currentUser = useAuthStore.getState().user;
+
+      if (!currentUser) {
+        toast.error('Erro ao processar login. Tente novamente.');
+        return;
+      }
+
+      // Store remember me preference (only email hint, not credentials)
       if (rememberMe) {
         localStorage.setItem('rememberStaff', 'true');
       } else {
         localStorage.removeItem('rememberStaff');
-      }
-
-      // Verify user role is staff
-      const currentUser = useAuthStore.getState().user;
-      const validStaffRoles = ['RESTAURANT_OWNER', 'WAITER', 'KITCHEN'];
-
-      if (!currentUser || !validStaffRoles.includes(currentUser.role)) {
-        toast.error('Acesso negado. Esta área é restrita para equipe de restaurante.');
-        useAuthStore.getState().logout();
-        return;
       }
 
       toast.success('Login realizado com sucesso!');
@@ -84,9 +84,18 @@ export default function RestaurantLoginPage() {
       }
     } catch (error: unknown) {
       console.error('Login error:', error);
-      const errorMessage = error && typeof error === 'object' && 'response' in error
-        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
-        : undefined;
+
+      // Extract error message from response
+      const axiosError = error as { response?: { status?: number; data?: { message?: string } } };
+      const statusCode = axiosError.response?.status;
+      const errorMessage = axiosError.response?.data?.message;
+
+      // Handle role isolation error (403)
+      if (statusCode === 403) {
+        toast.error('Acesso negado. Esta area e restrita para equipe de restaurante.');
+        return;
+      }
+
       toast.error(errorMessage || 'Erro ao fazer login. Verifique suas credenciais.');
     } finally {
       setIsLoading(false);
