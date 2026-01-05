@@ -57,7 +57,7 @@ export default function SuperAdminLoginPage() {
       const currentUser = useAuthStore.getState().user;
 
       // Validate SUPER_ADMIN or CONSULTANT role
-      if (!currentUser || (currentUser.role !== 'ADMIN' && currentUser.role !== 'CONSULTANT')) {
+      if (!currentUser || (currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'CONSULTANT')) {
         useAuthStore.getState().logout();
         toast.error('Acesso negado. Credenciais de administrador inválidas.');
         return;
