@@ -263,7 +263,7 @@ function OperationsPageContent() {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {Object.entries(status).map(([service, serviceStatus]) => {
-              const config = STATUS_CONFIG[serviceStatus];
+              const config = STATUS_CONFIG[serviceStatus as keyof typeof STATUS_CONFIG];
               const Icon = config.icon;
               const serviceNames: Record<string, { name: string; icon: React.ReactNode }> = {
                 api: { name: 'API Backend', icon: <Globe className="h-5 w-5" /> },
