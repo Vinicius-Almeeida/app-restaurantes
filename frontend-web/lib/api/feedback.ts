@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { apiClient } from './client';
 import type {
   Review,
   CreateReviewDto,
@@ -19,32 +19,11 @@ import type {
   ComplaintStatus,
 } from '@/lib/types/feedback';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
-
-// Create axios instance with default config
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add token to requests if available
-api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
-  return config;
-});
-
 // Reviews API
 export const reviewsApi = {
   // Create a new review
   create: async (data: CreateReviewDto): Promise<Review> => {
-    const response = await api.post('/api/reviews', data);
+    const response = await apiClient.post<Review>('/reviews', data);
     return response.data;
   },
 
@@ -58,33 +37,34 @@ export const reviewsApi = {
       hasResponse?: boolean;
     }
   ): Promise<{ reviews: Review[]; total: number; stats: ReviewStats }> => {
-    const response = await api.get(`/api/reviews/restaurant/${restaurantId}`, {
-      params,
-    });
+    const response = await apiClient.get<{ reviews: Review[]; total: number; stats: ReviewStats }>(
+      `/reviews/restaurant/${restaurantId}`,
+      { params }
+    );
     return response.data;
   },
 
   // Get review stats
   getStats: async (restaurantId: string): Promise<ReviewStats> => {
-    const response = await api.get(`/api/reviews/restaurant/${restaurantId}/stats`);
+    const response = await apiClient.get<ReviewStats>(`/reviews/restaurant/${restaurantId}/stats`);
     return response.data;
   },
 
   // Get review by ID
   getById: async (id: string): Promise<Review> => {
-    const response = await api.get(`/api/reviews/${id}`);
+    const response = await apiClient.get<Review>(`/reviews/${id}`);
     return response.data;
   },
 
   // Respond to a review (owner only)
   respond: async (id: string, data: ReviewResponseDto): Promise<Review> => {
-    const response = await api.post(`/api/reviews/${id}/response`, data);
+    const response = await apiClient.post<Review>(`/reviews/${id}/response`, data);
     return response.data;
   },
 
   // Delete a review
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/api/reviews/${id}`);
+    await apiClient.delete(`/reviews/${id}`);
   },
 };
 
@@ -92,7 +72,7 @@ export const reviewsApi = {
 export const suggestionsApi = {
   // Create a suggestion
   create: async (data: CreateSuggestionDto): Promise<Suggestion> => {
-    const response = await api.post('/api/suggestions', data);
+    const response = await apiClient.post<Suggestion>('/suggestions', data);
     return response.data;
   },
 
@@ -106,33 +86,34 @@ export const suggestionsApi = {
       status?: SuggestionStatus;
     }
   ): Promise<{ suggestions: Suggestion[]; total: number }> => {
-    const response = await api.get(`/api/suggestions/restaurant/${restaurantId}`, {
-      params,
-    });
+    const response = await apiClient.get<{ suggestions: Suggestion[]; total: number }>(
+      `/suggestions/restaurant/${restaurantId}`,
+      { params }
+    );
     return response.data;
   },
 
   // Get suggestion by ID
   getById: async (id: string): Promise<Suggestion> => {
-    const response = await api.get(`/api/suggestions/${id}`);
+    const response = await apiClient.get<Suggestion>(`/suggestions/${id}`);
     return response.data;
   },
 
   // Respond to a suggestion (owner only)
   respond: async (id: string, data: SuggestionResponseDto): Promise<Suggestion> => {
-    const response = await api.patch(`/api/suggestions/${id}/response`, data);
+    const response = await apiClient.patch<Suggestion>(`/suggestions/${id}/response`, data);
     return response.data;
   },
 
   // Update suggestion status
   updateStatus: async (id: string, status: SuggestionStatus): Promise<Suggestion> => {
-    const response = await api.patch(`/api/suggestions/${id}/status`, { status });
+    const response = await apiClient.patch<Suggestion>(`/suggestions/${id}/status`, { status });
     return response.data;
   },
 
   // Delete a suggestion
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/api/suggestions/${id}`);
+    await apiClient.delete(`/suggestions/${id}`);
   },
 };
 
@@ -140,7 +121,7 @@ export const suggestionsApi = {
 export const complaintsApi = {
   // Create a complaint
   create: async (data: CreateComplaintDto): Promise<Complaint> => {
-    const response = await api.post('/api/complaints', data);
+    const response = await apiClient.post<Complaint>('/complaints', data);
     return response.data;
   },
 
@@ -155,39 +136,40 @@ export const complaintsApi = {
       status?: ComplaintStatus;
     }
   ): Promise<{ complaints: Complaint[]; total: number }> => {
-    const response = await api.get(`/api/complaints/restaurant/${restaurantId}`, {
-      params,
-    });
+    const response = await apiClient.get<{ complaints: Complaint[]; total: number }>(
+      `/complaints/restaurant/${restaurantId}`,
+      { params }
+    );
     return response.data;
   },
 
   // Get complaint by ID
   getById: async (id: string): Promise<Complaint> => {
-    const response = await api.get(`/api/complaints/${id}`);
+    const response = await apiClient.get<Complaint>(`/complaints/${id}`);
     return response.data;
   },
 
   // Respond to a complaint
   respond: async (id: string, data: ComplaintResponseDto): Promise<Complaint> => {
-    const response = await api.patch(`/api/complaints/${id}/response`, data);
+    const response = await apiClient.patch<Complaint>(`/complaints/${id}/response`, data);
     return response.data;
   },
 
   // Update complaint status
   updateStatus: async (id: string, status: ComplaintStatus): Promise<Complaint> => {
-    const response = await api.patch(`/api/complaints/${id}/status`, { status });
+    const response = await apiClient.patch<Complaint>(`/complaints/${id}/status`, { status });
     return response.data;
   },
 
   // Escalate to super admin
   escalate: async (id: string, data: EscalateComplaintDto): Promise<Complaint> => {
-    const response = await api.post(`/api/complaints/${id}/escalate`, data);
+    const response = await apiClient.post<Complaint>(`/complaints/${id}/escalate`, data);
     return response.data;
   },
 
   // Delete a complaint
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/api/complaints/${id}`);
+    await apiClient.delete(`/complaints/${id}`);
   },
 };
 
@@ -195,7 +177,7 @@ export const complaintsApi = {
 export const npsApi = {
   // Submit NPS response
   create: async (data: CreateNpsResponseDto): Promise<NpsResponse> => {
-    const response = await api.post('/api/nps', data);
+    const response = await apiClient.post<NpsResponse>('/nps', data);
     return response.data;
   },
 
@@ -210,9 +192,10 @@ export const npsApi = {
       segment?: string;
     }
   ): Promise<{ responses: NpsResponse[]; total: number }> => {
-    const response = await api.get(`/api/nps/restaurant/${restaurantId}`, {
-      params,
-    });
+    const response = await apiClient.get<{ responses: NpsResponse[]; total: number }>(
+      `/nps/restaurant/${restaurantId}`,
+      { params }
+    );
     return response.data;
   },
 
@@ -224,9 +207,10 @@ export const npsApi = {
       endDate?: string;
     }
   ): Promise<NpsScore> => {
-    const response = await api.get(`/api/nps/restaurant/${restaurantId}/score`, {
-      params,
-    });
+    const response = await apiClient.get<NpsScore>(
+      `/nps/restaurant/${restaurantId}/score`,
+      { params }
+    );
     return response.data;
   },
 
@@ -239,9 +223,10 @@ export const npsApi = {
       interval?: 'day' | 'week' | 'month';
     }
   ): Promise<NpsTrend[]> => {
-    const response = await api.get(`/api/nps/restaurant/${restaurantId}/trend`, {
-      params,
-    });
+    const response = await apiClient.get<NpsTrend[]>(
+      `/nps/restaurant/${restaurantId}/trend`,
+      { params }
+    );
     return response.data;
   },
 };

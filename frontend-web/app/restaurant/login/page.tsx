@@ -66,9 +66,21 @@ export default function RestaurantLoginPage() {
       if (currentUser.role === 'RESTAURANT_OWNER') {
         router.push('/dashboard');
       } else if (currentUser.role === 'WAITER') {
-        router.push('/dashboard/orders');
+        // Waiter goes to waiter dashboard with restaurantId
+        const restaurantId = currentUser.restaurantId;
+        if (restaurantId) {
+          router.push(`/waiter/${restaurantId}`);
+        } else {
+          router.push('/dashboard/orders');
+        }
       } else if (currentUser.role === 'KITCHEN') {
-        router.push('/dashboard/orders');
+        // Kitchen staff goes to kitchen dashboard with restaurantId
+        const restaurantId = currentUser.restaurantId;
+        if (restaurantId) {
+          router.push(`/kitchen/${restaurantId}`);
+        } else {
+          router.push('/dashboard/orders');
+        }
       }
     } catch (error: unknown) {
       console.error('Login error:', error);
