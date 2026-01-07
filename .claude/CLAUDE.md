@@ -641,8 +641,10 @@ Padrão **AAA**: Arrange → Act → Assert
 - [ ] Acessibilidade (a11y)
 
 ### Git
-- [ ] Conventional Commits
-- [ ] SEM assinatura Claude
+- [ ] Commit convencional
+- [ ] SEM assinatura Claude/IA
+- [ ] Commit no perfil @Vinicius-Almeeida
+- [ ] Branch correta
 
 ---
 
@@ -669,7 +671,7 @@ Padrão **AAA**: Arrange → Act → Assert
 | Ambiente | URL |
 |----------|-----|
 | Frontend | `https://app-restaurantes.vercel.app` |
-| Backend API | `https://tabsync-backend.gentlecoast-55c82748.eastus2.azurecontainerapps.io` |
+| Backend API | `https://tabsync-backend.nicestone-9f661f17.brazilsouth.azurecontainerapps.io` |
 | Database | Supabase PostgreSQL (aws-1-sa-east-1) |
 
 ---
