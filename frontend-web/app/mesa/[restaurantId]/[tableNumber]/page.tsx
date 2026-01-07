@@ -42,7 +42,7 @@ interface Restaurant {
   description?: string;
   address?: string;
   phone?: string;
-  acceptingOrders: boolean;
+  acceptsOrders: boolean;
 }
 
 type PageState =
@@ -534,7 +534,7 @@ export default function TableMenuPage() {
               )}
             </div>
             <div className="flex items-center gap-3">
-              {restaurant.acceptingOrders ? (
+              {restaurant.acceptsOrders ? (
                 <Badge className="bg-green-600">Aberto</Badge>
               ) : (
                 <Badge variant="secondary">Fechado</Badge>
@@ -663,7 +663,7 @@ export default function TableMenuPage() {
                         <Button
                           className="w-full"
                           onClick={handleCheckout}
-                          disabled={!restaurant.acceptingOrders}
+                          disabled={!restaurant.acceptsOrders}
                         >
                           Finalizar Pedido
                         </Button>

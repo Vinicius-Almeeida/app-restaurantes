@@ -22,9 +22,9 @@ interface DashboardStats {
 
 interface RecentOrder {
   id: string;
-  tableNumber: number;
+  tableNumber: string | number;
   status: string;
-  totalAmount: number;
+  totalAmount: string | number;
   createdAt: string;
 }
 
@@ -57,7 +57,7 @@ function DashboardContent() {
         (o) => new Date(o.createdAt) >= today
       );
 
-      const todayRevenue = todayOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+      const todayRevenue = todayOrders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
       const averageTicket = todayOrders.length > 0 ? todayRevenue / todayOrders.length : 0;
       const pendingOrders = orders.filter(
         (o) => o.status === 'PENDING' || o.status === 'CONFIRMED'
@@ -172,7 +172,7 @@ function DashboardContent() {
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-orange-600">
-                            {formatPrice(order.totalAmount)}
+                            {formatPrice(Number(order.totalAmount))}
                           </p>
                         </div>
                       </div>

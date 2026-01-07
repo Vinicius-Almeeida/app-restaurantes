@@ -11,7 +11,7 @@ interface RestaurantCardProps {
   address?: string;
   phone?: string;
   isActive: boolean;
-  acceptingOrders: boolean;
+  acceptsOrders: boolean;
 }
 
 export function RestaurantCard({
@@ -21,7 +21,7 @@ export function RestaurantCard({
   cuisine,
   address,
   isActive,
-  acceptingOrders,
+  acceptsOrders,
 }: RestaurantCardProps) {
   return (
     <Link href={`/r/${slug}`}>
@@ -29,7 +29,7 @@ export function RestaurantCard({
         <CardHeader>
           <div className="flex justify-between items-start">
             <CardTitle className="text-xl">{name}</CardTitle>
-            {acceptingOrders ? (
+            {acceptsOrders ? (
               <Badge variant="default" className="bg-green-600">
                 Aberto
               </Badge>

@@ -1,390 +1,576 @@
-import {
-  PrismaClient,
-  UserRole,
-  OrderStatus,
-  PaymentMethod,
-  PaymentStatus,
-  SplitMethod,
-  SplitPaymentStatus,
-  StockEntryType,
-  SessionStatus,
-  SubscriptionStatus,
-  SuggestionCategory,
-  SuggestionStatus,
-  ComplaintCategory,
-  ComplaintStatus,
-  Priority,
-} from '@prisma/client';
-import type { Prisma } from '@prisma/client';
+/**
+ * TabSync - Seed de Produção Ultra-Realista
+ *
+ * BOTECO DO CHEF - Boteco Brasileiro Premium
+ * Simulação completa de 6 meses de operação real
+ *
+ * Inclui:
+ * - Cardápio completo com 80+ itens
+ * - Receitas com ingredientes e quantidades reais
+ * - Estoque detalhado (ingredientes, bebidas, embalagens)
+ * - Histórico de vendas de 6 meses com sazonalidade
+ * - Fornecedores reais
+ * - Reviews, NPS, sugestões e reclamações
+ * - Mesas ativas com sessões em andamento
+ */
+
+import { PrismaClient, UserRole, OrderStatus, PaymentStatus, PaymentMethod, SplitMethod, SessionStatus, MemberRole, MemberStatus, MemberPaymentStatus, SubscriptionStatus, InvoiceStatus, StockEntryType, SuggestionCategory, SuggestionStatus, ComplaintCategory, Priority, ComplaintStatus, WaiterCallStatus, WaiterCallPriority } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-// Helper function to generate UUIDs
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+// ============================================
+// HELPERS
+// ============================================
+
+function generateOrderNumber(): string {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `ORD-${timestamp}-${random}`;
 }
 
-// Helper function to generate order numbers
-function generateOrderNumber(prefix: string, index: number): string {
-  return `${prefix}-${String(index).padStart(4, '0')}`;
+function generateQrCode(tableNumber: number, restaurantSlug: string): string {
+  return `${restaurantSlug}-mesa-${tableNumber}-${Date.now().toString(36)}`;
 }
 
-// Helper function to generate QR codes
-function generateQRCode(restaurantSlug: string, tableNumber: number): string {
-  return `${restaurantSlug}-table-${tableNumber}-${generateUUID().substring(0, 8)}`;
+function generatePaymentToken(): string {
+  return `pay_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 15)}`;
 }
 
-// Helper to create dates relative to now
-function daysAgo(days: number, hours = 0, minutes = 0): Date {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  date.setHours(hours, minutes, 0, 0);
-  return date;
+function randomBetween(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function hoursAgo(hours: number, minutes = 0): Date {
-  const date = new Date();
-  date.setHours(date.getHours() - hours, minutes, 0, 0);
-  return date;
+function randomDecimal(min: number, max: number, decimals: number = 2): number {
+  const value = Math.random() * (max - min) + min;
+  return Number(value.toFixed(decimals));
 }
+
+function randomFromArray<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function shuffleArray<T>(arr: T[]): T[] {
+  const shuffled = [...arr];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+// Calcula fator de demanda baseado no dia da semana e se é feriado
+function getDemandFactor(date: Date, isHoliday: boolean = false): number {
+  const dayOfWeek = date.getDay();
+
+  if (isHoliday) return 1.8; // Feriados +80%
+
+  switch (dayOfWeek) {
+    case 0: return 1.3;  // Domingo +30%
+    case 1: return 0.6;  // Segunda -40%
+    case 2: return 0.7;  // Terça -30%
+    case 3: return 0.8;  // Quarta -20%
+    case 4: return 0.9;  // Quinta -10%
+    case 5: return 1.4;  // Sexta +40%
+    case 6: return 1.5;  // Sábado +50%
+    default: return 1.0;
+  }
+}
+
+// Feriados brasileiros 2024/2025
+const HOLIDAYS = [
+  '2024-07-09', '2024-09-07', '2024-10-12', '2024-11-02', '2024-11-15',
+  '2024-11-20', '2024-12-25', '2024-12-31', '2025-01-01',
+];
+
+function isHoliday(date: Date): boolean {
+  const dateStr = date.toISOString().split('T')[0];
+  return HOLIDAYS.includes(dateStr);
+}
+
+// ============================================
+// DADOS DO CARDÁPIO - BOTECO BRASILEIRO PREMIUM
+// ============================================
+
+const MENU_CATEGORIES = [
+  { name: 'Entradas', description: 'Porções e petiscos para compartilhar', order: 1 },
+  { name: 'Caldos', description: 'Caldos quentes e reconfortantes', order: 2 },
+  { name: 'Pratos Principais', description: 'Pratos fartos da cozinha brasileira', order: 3 },
+  { name: 'Grelhados', description: 'Carnes e peixes na brasa', order: 4 },
+  { name: 'Massas', description: 'Massas artesanais', order: 5 },
+  { name: 'Saladas', description: 'Saladas frescas e leves', order: 6 },
+  { name: 'Acompanhamentos', description: 'Para complementar seu prato', order: 7 },
+  { name: 'Sobremesas', description: 'Doces tradicionais brasileiros', order: 8 },
+  { name: 'Cervejas', description: 'Cervejas artesanais e importadas', order: 9 },
+  { name: 'Drinks', description: 'Coquetéis clássicos e autorais', order: 10 },
+  { name: 'Cachaças', description: 'Cachaças premium selecionadas', order: 11 },
+  { name: 'Vinhos', description: 'Carta de vinhos nacionais e importados', order: 12 },
+  { name: 'Não Alcoólicos', description: 'Sucos, refrigerantes e águas', order: 13 },
+  { name: 'Cafés', description: 'Cafés especiais e digestivos', order: 14 },
+];
+
+const MENU_ITEMS = [
+  // ========== ENTRADAS ==========
+  { category: 'Entradas', name: 'Bolinho de Bacalhau (6 un)', description: 'Bolinhos crocantes de bacalhau desfiado com batata, servidos com molho tártaro da casa', price: 42.90, calories: 380, allergens: ['glúten', 'peixe', 'ovo'] },
+  { category: 'Entradas', name: 'Bolinho de Feijoada (8 un)', description: 'Bolinhos cremosos recheados com feijoada desfiada, acompanha vinagrete', price: 38.90, calories: 420, allergens: ['glúten'] },
+  { category: 'Entradas', name: 'Coxinha de Frango (6 un)', description: 'Coxinhas artesanais com frango desfiado e catupiry, massa crocante', price: 34.90, calories: 450, allergens: ['glúten', 'leite'] },
+  { category: 'Entradas', name: 'Pastel de Carne Seca', description: 'Pastel gigante recheado com carne seca desfiada, cream cheese e cebola caramelizada', price: 28.90, calories: 520, allergens: ['glúten', 'leite'] },
+  { category: 'Entradas', name: 'Torresmo de Rolo', description: '300g de torresmo crocante com limão e pimenta', price: 45.90, calories: 680, allergens: [] },
+  { category: 'Entradas', name: 'Calabresa Acebolada', description: 'Linguiça calabresa fatiada com cebolas caramelizadas e farofa', price: 39.90, calories: 520, allergens: [] },
+  { category: 'Entradas', name: 'Provolone à Milanesa', description: 'Fatias de provolone empanadas, servidas com geleia de pimenta', price: 44.90, calories: 480, allergens: ['glúten', 'leite', 'ovo'] },
+  { category: 'Entradas', name: 'Mandioca Frita', description: 'Palitos de mandioca fritos, crocantes por fora e macios por dentro', price: 29.90, calories: 320, allergens: [] },
+  { category: 'Entradas', name: 'Dadinho de Tapioca', description: 'Cubos de tapioca com queijo coalho, servidos com geleia de pimenta', price: 36.90, calories: 290, allergens: ['leite'] },
+  { category: 'Entradas', name: 'Isca de Peixe (400g)', description: 'Iscas de tilápia empanadas com molho tártaro', price: 48.90, calories: 410, allergens: ['glúten', 'peixe', 'ovo'] },
+  { category: 'Entradas', name: 'Carne de Sol na Nata', description: 'Cubos de carne de sol salteados na manteiga com nata e queijo coalho', price: 52.90, calories: 580, allergens: ['leite'] },
+  { category: 'Entradas', name: 'Batata Rústica com Bacon', description: 'Batatas assadas com casca, bacon crocante, cheddar e cebolinha', price: 38.90, calories: 490, allergens: ['leite'] },
+  { category: 'Entradas', name: 'Escondidinho de Carne Seca', description: 'Porção individual de purê de mandioca com carne seca desfiada e queijo gratinado', price: 42.90, calories: 520, allergens: ['leite'] },
+  { category: 'Entradas', name: 'Frango a Passarinho', description: 'Pedaços de frango temperados e fritos, servidos com limão', price: 44.90, calories: 480, allergens: [] },
+  { category: 'Entradas', name: 'Queijo Coalho na Brasa', description: '4 espetos de queijo coalho grelhado com melaço de cana', price: 32.90, calories: 340, allergens: ['leite'] },
+
+  // ========== CALDOS ==========
+  { category: 'Caldos', name: 'Caldo de Feijão', description: 'Caldo espesso de feijão preto com bacon, linguiça e torresmo', price: 24.90, calories: 320, allergens: [] },
+  { category: 'Caldos', name: 'Caldo de Mocotó', description: 'Tradicional caldo de mocotó com grão de bico', price: 28.90, calories: 280, allergens: [] },
+  { category: 'Caldos', name: 'Caldo Verde', description: 'Caldo de batata com couve fatiada e linguiça calabresa', price: 22.90, calories: 260, allergens: [] },
+  { category: 'Caldos', name: 'Caldo de Costela', description: 'Caldo encorpado de costela bovina desfiada com mandioca', price: 32.90, calories: 380, allergens: [] },
+  { category: 'Caldos', name: 'Caldo de Camarão', description: 'Caldo cremoso de camarão com leite de coco e dendê', price: 38.90, calories: 290, allergens: ['crustáceo', 'leite'] },
+
+  // ========== PRATOS PRINCIPAIS ==========
+  { category: 'Pratos Principais', name: 'Feijoada Completa', description: 'Feijoada tradicional com todas as carnes, acompanha arroz, couve, farofa, torresmo e laranja (serve 2)', price: 89.90, calories: 1200, allergens: [] },
+  { category: 'Pratos Principais', name: 'Feijoada Individual', description: 'Porção individual da nossa feijoada com acompanhamentos', price: 52.90, calories: 680, allergens: [] },
+  { category: 'Pratos Principais', name: 'Baião de Dois', description: 'Arroz com feijão verde, queijo coalho, nata e carne de sol desfiada', price: 54.90, calories: 720, allergens: ['leite'] },
+  { category: 'Pratos Principais', name: 'Galinhada Caipira', description: 'Arroz com frango caipira, pequi, açafrão e quiabo (serve 2)', price: 78.90, calories: 890, allergens: [] },
+  { category: 'Pratos Principais', name: 'Rabada com Agrião', description: 'Rabada bovina cozida lentamente, servida com agrião refogado e polenta cremosa', price: 72.90, calories: 780, allergens: ['leite'] },
+  { category: 'Pratos Principais', name: 'Costela no Bafo', description: 'Costela bovina assada lentamente por 6 horas, desfiando no garfo (serve 2-3)', price: 129.90, calories: 1100, allergens: [] },
+  { category: 'Pratos Principais', name: 'Moqueca de Peixe', description: 'Posta de peixe cozida no leite de coco, dendê, pimentões e coentro, servida com pirão', price: 79.90, calories: 620, allergens: ['peixe', 'leite'] },
+  { category: 'Pratos Principais', name: 'Moqueca de Camarão', description: 'Camarões grandes cozidos no leite de coco e dendê, acompanha arroz e pirão', price: 98.90, calories: 580, allergens: ['crustáceo', 'leite'] },
+  { category: 'Pratos Principais', name: 'Bobó de Camarão', description: 'Creme de mandioca com camarões, leite de coco e dendê', price: 89.90, calories: 650, allergens: ['crustáceo', 'leite'] },
+  { category: 'Pratos Principais', name: 'Escondidinho Grande', description: 'Travessa de purê de mandioca com carne seca desfiada gratinada (serve 2)', price: 68.90, calories: 920, allergens: ['leite'] },
+  { category: 'Pratos Principais', name: 'Arroz Carreteiro', description: 'Arroz com carne de sol desfiada, vinagrete e ovo frito', price: 48.90, calories: 680, allergens: ['ovo'] },
+  { category: 'Pratos Principais', name: 'Frango com Quiabo', description: 'Frango caipira ensopado com quiabo, servido com angu cremoso', price: 52.90, calories: 580, allergens: [] },
+
+  // ========== GRELHADOS ==========
+  { category: 'Grelhados', name: 'Picanha na Brasa (400g)', description: 'Picanha argentina grelhada no ponto, acompanha arroz, farofa e vinagrete', price: 89.90, calories: 720, allergens: [] },
+  { category: 'Grelhados', name: 'Fraldinha Grelhada (350g)', description: 'Fraldinha maturada grelhada, servida com chimichurri', price: 72.90, calories: 580, allergens: [] },
+  { category: 'Grelhados', name: 'Costela Fogo de Chão (600g)', description: 'Costela bovina assada na brasa, corte grosso', price: 98.90, calories: 890, allergens: [] },
+  { category: 'Grelhados', name: 'Linguiça Artesanal na Brasa', description: '400g de linguiça toscana artesanal grelhada', price: 48.90, calories: 520, allergens: [] },
+  { category: 'Grelhados', name: 'Filé de Tilápia Grelhado', description: 'Filé de tilápia grelhado com ervas, acompanha legumes salteados', price: 58.90, calories: 320, allergens: ['peixe'] },
+  { category: 'Grelhados', name: 'Salmão Grelhado', description: 'Posta de salmão grelhada com molho de maracujá', price: 78.90, calories: 420, allergens: ['peixe'] },
+
+  // ========== MASSAS ==========
+  { category: 'Massas', name: 'Nhoque da Nonna', description: 'Nhoque de batata artesanal com molho pomodoro e manjericão', price: 48.90, calories: 580, allergens: ['glúten', 'ovo'] },
+  { category: 'Massas', name: 'Nhoque ao Sugo', description: 'Nhoque de batata ao molho de tomate fresco', price: 44.90, calories: 520, allergens: ['glúten', 'ovo'] },
+  { category: 'Massas', name: 'Macarrão na Chapa', description: 'Espaguete salteado na chapa com carne, legumes e molho shoyu', price: 52.90, calories: 680, allergens: ['glúten', 'soja'] },
+
+  // ========== SALADAS ==========
+  { category: 'Saladas', name: 'Salada Caesar', description: 'Alface americana, croutons, parmesão e molho caesar, com frango grelhado', price: 38.90, calories: 320, allergens: ['glúten', 'ovo', 'leite'] },
+  { category: 'Saladas', name: 'Salada Tropical', description: 'Mix de folhas com manga, abacaxi, palmito e molho de maracujá', price: 32.90, calories: 180, allergens: [] },
+  { category: 'Saladas', name: 'Salada Caprese', description: 'Tomate, mozzarella de búfala, manjericão fresco e redução de balsâmico', price: 36.90, calories: 280, allergens: ['leite'] },
+
+  // ========== ACOMPANHAMENTOS ==========
+  { category: 'Acompanhamentos', name: 'Arroz Branco', description: 'Porção de arroz agulhinha', price: 14.90, calories: 200, allergens: [] },
+  { category: 'Acompanhamentos', name: 'Arroz à Grega', description: 'Arroz com legumes salteados', price: 18.90, calories: 240, allergens: [] },
+  { category: 'Acompanhamentos', name: 'Feijão Tropeiro', description: 'Feijão com farinha, torresmo, ovo e linguiça', price: 24.90, calories: 380, allergens: ['ovo'] },
+  { category: 'Acompanhamentos', name: 'Farofa da Casa', description: 'Farofa com bacon, ovo e banana', price: 18.90, calories: 320, allergens: ['ovo'] },
+  { category: 'Acompanhamentos', name: 'Vinagrete', description: 'Tomate, cebola, pimentão e coentro', price: 12.90, calories: 80, allergens: [] },
+  { category: 'Acompanhamentos', name: 'Batata Frita', description: 'Porção de batatas fritas sequinhas', price: 22.90, calories: 380, allergens: [] },
+  { category: 'Acompanhamentos', name: 'Purê de Mandioca', description: 'Purê cremoso de mandioca com manteiga', price: 19.90, calories: 280, allergens: ['leite'] },
+  { category: 'Acompanhamentos', name: 'Couve Refogada', description: 'Couve fatiada refogada no alho', price: 16.90, calories: 120, allergens: [] },
+  { category: 'Acompanhamentos', name: 'Polenta Cremosa', description: 'Polenta cremosa com parmesão', price: 19.90, calories: 260, allergens: ['leite'] },
+
+  // ========== SOBREMESAS ==========
+  { category: 'Sobremesas', name: 'Pudim de Leite', description: 'Pudim cremoso de leite condensado com calda de caramelo', price: 18.90, calories: 320, allergens: ['leite', 'ovo'] },
+  { category: 'Sobremesas', name: 'Brigadeiro de Colher', description: 'Brigadeiro gourmet servido na colher com granulado belga', price: 16.90, calories: 280, allergens: ['leite'] },
+  { category: 'Sobremesas', name: 'Romeu e Julieta', description: 'Goiabada cascão com queijo minas artesanal', price: 22.90, calories: 340, allergens: ['leite'] },
+  { category: 'Sobremesas', name: 'Cartola', description: 'Banana frita com queijo coalho derretido, canela e açúcar', price: 24.90, calories: 380, allergens: ['leite'] },
+  { category: 'Sobremesas', name: 'Petit Gateau', description: 'Bolo quente de chocolate com sorvete de creme', price: 28.90, calories: 480, allergens: ['glúten', 'leite', 'ovo'] },
+  { category: 'Sobremesas', name: 'Sorvete (3 bolas)', description: 'Sorvetes artesanais - consulte sabores', price: 19.90, calories: 320, allergens: ['leite'] },
+  { category: 'Sobremesas', name: 'Açaí na Tigela (400ml)', description: 'Açaí batido com granola, banana e mel', price: 26.90, calories: 420, allergens: [] },
+
+  // ========== CERVEJAS ==========
+  { category: 'Cervejas', name: 'Brahma Chopp (300ml)', description: 'Chopp Brahma bem gelado', price: 9.90, calories: 120, allergens: ['glúten'] },
+  { category: 'Cervejas', name: 'Brahma Chopp (500ml)', description: 'Caneca de chopp Brahma', price: 14.90, calories: 200, allergens: ['glúten'] },
+  { category: 'Cervejas', name: 'Original (600ml)', description: 'Cerveja Original - a legítima', price: 18.90, calories: 260, allergens: ['glúten'] },
+  { category: 'Cervejas', name: 'Heineken (330ml)', description: 'Long neck Heineken', price: 14.90, calories: 140, allergens: ['glúten'] },
+  { category: 'Cervejas', name: 'Heineken (600ml)', description: 'Garrafa Heineken', price: 22.90, calories: 280, allergens: ['glúten'] },
+  { category: 'Cervejas', name: 'Stella Artois (330ml)', description: 'Long neck Stella Artois', price: 14.90, calories: 150, allergens: ['glúten'] },
+  { category: 'Cervejas', name: 'Budweiser (330ml)', description: 'Long neck Budweiser', price: 12.90, calories: 140, allergens: ['glúten'] },
+  { category: 'Cervejas', name: 'Colorado Appia (600ml)', description: 'Cerveja artesanal com mel', price: 28.90, calories: 280, allergens: ['glúten'] },
+  { category: 'Cervejas', name: 'Eisenbahn Pilsen (600ml)', description: 'Cerveja artesanal Pilsen', price: 26.90, calories: 260, allergens: ['glúten'] },
+  { category: 'Cervejas', name: 'IPA da Casa (500ml)', description: 'IPA artesanal produzida exclusivamente para o Boteco', price: 32.90, calories: 220, allergens: ['glúten'] },
+
+  // ========== DRINKS ==========
+  { category: 'Drinks', name: 'Caipirinha de Limão', description: 'Cachaça, limão, açúcar e gelo', price: 22.90, calories: 180, allergens: [] },
+  { category: 'Drinks', name: 'Caipirinha de Morango', description: 'Cachaça, morango fresco, açúcar e gelo', price: 26.90, calories: 200, allergens: [] },
+  { category: 'Drinks', name: 'Caipirinha de Maracujá', description: 'Cachaça, maracujá fresco, açúcar e gelo', price: 26.90, calories: 190, allergens: [] },
+  { category: 'Drinks', name: 'Caipivodka de Limão', description: 'Vodka, limão, açúcar e gelo', price: 26.90, calories: 175, allergens: [] },
+  { category: 'Drinks', name: 'Moscow Mule', description: 'Vodka, cerveja de gengibre, limão e hortelã', price: 32.90, calories: 160, allergens: [] },
+  { category: 'Drinks', name: 'Mojito', description: 'Rum, hortelã, limão, açúcar e água com gás', price: 28.90, calories: 170, allergens: [] },
+  { category: 'Drinks', name: 'Gin Tônica', description: 'Gin, água tônica e limão siciliano', price: 32.90, calories: 140, allergens: [] },
+  { category: 'Drinks', name: 'Aperol Spritz', description: 'Aperol, prosecco e água com gás', price: 34.90, calories: 180, allergens: [] },
+  { category: 'Drinks', name: 'Negroni', description: 'Gin, Campari e vermute rosso', price: 36.90, calories: 190, allergens: [] },
+
+  // ========== CACHAÇAS ==========
+  { category: 'Cachaças', name: 'Cachaça Salinas (dose)', description: 'Cachaça mineira tradicional', price: 12.90, calories: 65, allergens: [] },
+  { category: 'Cachaças', name: 'Cachaça Leblon (dose)', description: 'Cachaça premium envelhecida', price: 18.90, calories: 65, allergens: [] },
+  { category: 'Cachaças', name: 'Cachaça Ypióca Ouro (dose)', description: 'Cachaça envelhecida em carvalho', price: 16.90, calories: 65, allergens: [] },
+  { category: 'Cachaças', name: 'Cachaça 51 (dose)', description: 'A cachaça mais famosa do Brasil', price: 8.90, calories: 65, allergens: [] },
+  { category: 'Cachaças', name: 'Cachaça Germana (dose)', description: 'Cachaça artesanal premium', price: 22.90, calories: 65, allergens: [] },
+
+  // ========== VINHOS ==========
+  { category: 'Vinhos', name: 'Vinho da Casa Tinto (taça)', description: 'Cabernet Sauvignon chileno', price: 18.90, calories: 125, allergens: ['sulfitos'] },
+  { category: 'Vinhos', name: 'Vinho da Casa Branco (taça)', description: 'Sauvignon Blanc chileno', price: 18.90, calories: 120, allergens: ['sulfitos'] },
+  { category: 'Vinhos', name: 'Casillero del Diablo (garrafa)', description: 'Cabernet Sauvignon - Chile', price: 98.90, calories: 625, allergens: ['sulfitos'] },
+  { category: 'Vinhos', name: 'Concha y Toro Reservado (garrafa)', description: 'Carmenère - Chile', price: 79.90, calories: 625, allergens: ['sulfitos'] },
+  { category: 'Vinhos', name: 'Miolo Reserva (garrafa)', description: 'Merlot - Brasil', price: 89.90, calories: 625, allergens: ['sulfitos'] },
+
+  // ========== NÃO ALCOÓLICOS ==========
+  { category: 'Não Alcoólicos', name: 'Refrigerante Lata', description: 'Coca-Cola, Guaraná, Sprite ou Fanta', price: 7.90, calories: 140, allergens: [] },
+  { category: 'Não Alcoólicos', name: 'Refrigerante 600ml', description: 'Coca-Cola, Guaraná ou Fanta', price: 10.90, calories: 250, allergens: [] },
+  { category: 'Não Alcoólicos', name: 'Água Mineral (500ml)', description: 'Água mineral com ou sem gás', price: 5.90, calories: 0, allergens: [] },
+  { category: 'Não Alcoólicos', name: 'Água de Coco', description: 'Água de coco natural', price: 8.90, calories: 45, allergens: [] },
+  { category: 'Não Alcoólicos', name: 'Suco Natural de Laranja', description: 'Suco de laranja espremido na hora', price: 12.90, calories: 110, allergens: [] },
+  { category: 'Não Alcoólicos', name: 'Suco Natural de Maracujá', description: 'Suco de maracujá natural', price: 12.90, calories: 95, allergens: [] },
+  { category: 'Não Alcoólicos', name: 'Suco Natural de Limão', description: 'Limonada suíça ou tradicional', price: 10.90, calories: 85, allergens: [] },
+  { category: 'Não Alcoólicos', name: 'Chá Gelado', description: 'Chá gelado de limão ou pêssego', price: 8.90, calories: 90, allergens: [] },
+  { category: 'Não Alcoólicos', name: 'Red Bull', description: 'Energético Red Bull 250ml', price: 16.90, calories: 110, allergens: [] },
+
+  // ========== CAFÉS ==========
+  { category: 'Cafés', name: 'Café Expresso', description: 'Café expresso tradicional', price: 6.90, calories: 5, allergens: [] },
+  { category: 'Cafés', name: 'Café Expresso Duplo', description: 'Dose dupla de café expresso', price: 9.90, calories: 10, allergens: [] },
+  { category: 'Cafés', name: 'Cappuccino', description: 'Café expresso com leite vaporizado e espuma', price: 12.90, calories: 120, allergens: ['leite'] },
+  { category: 'Cafés', name: 'Café com Leite', description: 'Café com leite cremoso', price: 8.90, calories: 80, allergens: ['leite'] },
+  { category: 'Cafés', name: 'Irish Coffee', description: 'Café com whisky e chantilly', price: 24.90, calories: 180, allergens: ['leite'] },
+];
+
+// ============================================
+// INGREDIENTES E ESTOQUE
+// ============================================
+
+const INVENTORY_ITEMS = [
+  // ===== CARNES =====
+  { name: 'Picanha Argentina', sku: 'CAR001', unit: 'KG', minStock: 10 },
+  { name: 'Fraldinha Maturada', sku: 'CAR002', unit: 'KG', minStock: 8 },
+  { name: 'Costela Bovina', sku: 'CAR003', unit: 'KG', minStock: 15 },
+  { name: 'Carne de Sol', sku: 'CAR004', unit: 'KG', minStock: 12 },
+  { name: 'Carne Seca', sku: 'CAR005', unit: 'KG', minStock: 10 },
+  { name: 'Rabada Bovina', sku: 'CAR006', unit: 'KG', minStock: 8 },
+  { name: 'Linguiça Calabresa', sku: 'CAR008', unit: 'KG', minStock: 8 },
+  { name: 'Linguiça Toscana', sku: 'CAR009', unit: 'KG', minStock: 6 },
+  { name: 'Bacon em Cubos', sku: 'CAR010', unit: 'KG', minStock: 5 },
+  { name: 'Torresmo', sku: 'CAR011', unit: 'KG', minStock: 4 },
+  { name: 'Frango Inteiro', sku: 'CAR012', unit: 'KG', minStock: 15 },
+  { name: 'Peito de Frango', sku: 'CAR013', unit: 'KG', minStock: 10 },
+
+  // ===== PEIXES E FRUTOS DO MAR =====
+  { name: 'Bacalhau Dessalgado', sku: 'PEI001', unit: 'KG', minStock: 5 },
+  { name: 'Filé de Tilápia', sku: 'PEI002', unit: 'KG', minStock: 8 },
+  { name: 'Salmão Fresco', sku: 'PEI003', unit: 'KG', minStock: 4 },
+  { name: 'Camarão Limpo Grande', sku: 'PEI005', unit: 'KG', minStock: 5 },
+
+  // ===== LATICÍNIOS =====
+  { name: 'Queijo Coalho', sku: 'LAT001', unit: 'KG', minStock: 8 },
+  { name: 'Queijo Minas', sku: 'LAT002', unit: 'KG', minStock: 5 },
+  { name: 'Queijo Provolone', sku: 'LAT003', unit: 'KG', minStock: 4 },
+  { name: 'Mozzarella de Búfala', sku: 'LAT004', unit: 'KG', minStock: 3 },
+  { name: 'Catupiry', sku: 'LAT006', unit: 'KG', minStock: 4 },
+  { name: 'Nata', sku: 'LAT008', unit: 'L', minStock: 5 },
+  { name: 'Leite Integral', sku: 'LAT009', unit: 'L', minStock: 20 },
+  { name: 'Leite Condensado', sku: 'LAT010', unit: 'UN', minStock: 20 },
+  { name: 'Manteiga com Sal', sku: 'LAT012', unit: 'KG', minStock: 5 },
+  { name: 'Ovos Caipira', sku: 'LAT013', unit: 'DZ', minStock: 10 },
+
+  // ===== VEGETAIS E LEGUMES =====
+  { name: 'Batata Inglesa', sku: 'VEG001', unit: 'KG', minStock: 30 },
+  { name: 'Mandioca', sku: 'VEG002', unit: 'KG', minStock: 25 },
+  { name: 'Cebola', sku: 'VEG003', unit: 'KG', minStock: 15 },
+  { name: 'Alho', sku: 'VEG004', unit: 'KG', minStock: 3 },
+  { name: 'Tomate', sku: 'VEG005', unit: 'KG', minStock: 10 },
+  { name: 'Pimentão Verde', sku: 'VEG006', unit: 'KG', minStock: 4 },
+  { name: 'Pimentão Vermelho', sku: 'VEG007', unit: 'KG', minStock: 4 },
+  { name: 'Couve Manteiga', sku: 'VEG009', unit: 'MÇ', minStock: 15 },
+  { name: 'Quiabo', sku: 'VEG010', unit: 'KG', minStock: 5 },
+  { name: 'Limão Tahiti', sku: 'VEG012', unit: 'KG', minStock: 10 },
+  { name: 'Laranja Pera', sku: 'VEG014', unit: 'KG', minStock: 10 },
+  { name: 'Maracujá', sku: 'VEG015', unit: 'KG', minStock: 5 },
+  { name: 'Morango', sku: 'VEG016', unit: 'KG', minStock: 3 },
+  { name: 'Banana Prata', sku: 'VEG017', unit: 'KG', minStock: 8 },
+  { name: 'Alface Americana', sku: 'VEG020', unit: 'UN', minStock: 10 },
+  { name: 'Coentro', sku: 'VEG023', unit: 'MÇ', minStock: 10 },
+  { name: 'Hortelã', sku: 'VEG024', unit: 'MÇ', minStock: 8 },
+
+  // ===== GRÃOS E FARINHAS =====
+  { name: 'Arroz Agulhinha', sku: 'GRA001', unit: 'KG', minStock: 40 },
+  { name: 'Feijão Preto', sku: 'GRA002', unit: 'KG', minStock: 25 },
+  { name: 'Feijão Carioca', sku: 'GRA003', unit: 'KG', minStock: 15 },
+  { name: 'Farinha de Mandioca', sku: 'GRA005', unit: 'KG', minStock: 15 },
+  { name: 'Farinha de Trigo', sku: 'GRA006', unit: 'KG', minStock: 20 },
+  { name: 'Fubá', sku: 'GRA008', unit: 'KG', minStock: 10 },
+  { name: 'Macarrão Espaguete', sku: 'GRA011', unit: 'KG', minStock: 10 },
+
+  // ===== ÓLEOS E TEMPEROS =====
+  { name: 'Óleo de Soja', sku: 'OLE001', unit: 'L', minStock: 20 },
+  { name: 'Azeite Extra Virgem', sku: 'OLE002', unit: 'L', minStock: 8 },
+  { name: 'Óleo de Dendê', sku: 'OLE003', unit: 'L', minStock: 5 },
+  { name: 'Leite de Coco', sku: 'OLE004', unit: 'L', minStock: 10 },
+  { name: 'Açúcar Refinado', sku: 'OLE007', unit: 'KG', minStock: 15 },
+  { name: 'Sal Refinado', sku: 'OLE009', unit: 'KG', minStock: 10 },
+  { name: 'Goiabada Cascão', sku: 'OLE019', unit: 'KG', minStock: 3 },
+
+  // ===== BEBIDAS ALCOÓLICAS =====
+  { name: 'Cachaça 51 (1L)', sku: 'BEB001', unit: 'UN', minStock: 12 },
+  { name: 'Cachaça Salinas (700ml)', sku: 'BEB002', unit: 'UN', minStock: 8 },
+  { name: 'Cachaça Leblon (750ml)', sku: 'BEB003', unit: 'UN', minStock: 6 },
+  { name: 'Vodka Absolut (1L)', sku: 'BEB007', unit: 'UN', minStock: 6 },
+  { name: 'Gin Tanqueray (750ml)', sku: 'BEB009', unit: 'UN', minStock: 4 },
+  { name: 'Rum Bacardi (1L)', sku: 'BEB011', unit: 'UN', minStock: 4 },
+  { name: 'Campari (1L)', sku: 'BEB013', unit: 'UN', minStock: 3 },
+  { name: 'Aperol (750ml)', sku: 'BEB014', unit: 'UN', minStock: 4 },
+  { name: 'Água Tônica (350ml)', sku: 'BEB018', unit: 'UN', minStock: 48 },
+
+  // ===== CERVEJAS =====
+  { name: 'Chopp Brahma (Barril 30L)', sku: 'CHO001', unit: 'UN', minStock: 4 },
+  { name: 'Cerveja Original 600ml', sku: 'CER001', unit: 'UN', minStock: 48 },
+  { name: 'Heineken Long Neck 330ml', sku: 'CER002', unit: 'UN', minStock: 72 },
+  { name: 'Heineken 600ml', sku: 'CER003', unit: 'UN', minStock: 36 },
+  { name: 'Stella Artois Long Neck', sku: 'CER004', unit: 'UN', minStock: 48 },
+  { name: 'Budweiser Long Neck', sku: 'CER005', unit: 'UN', minStock: 48 },
+  { name: 'Colorado Appia 600ml', sku: 'CER006', unit: 'UN', minStock: 24 },
+  { name: 'Eisenbahn Pilsen 600ml', sku: 'CER007', unit: 'UN', minStock: 24 },
+  { name: 'IPA da Casa 500ml', sku: 'CER008', unit: 'UN', minStock: 36 },
+
+  // ===== VINHOS =====
+  { name: 'Vinho Casillero del Diablo (750ml)', sku: 'VIN001', unit: 'UN', minStock: 12 },
+  { name: 'Vinho Concha y Toro Reservado (750ml)', sku: 'VIN002', unit: 'UN', minStock: 12 },
+  { name: 'Vinho Miolo Reserva (750ml)', sku: 'VIN003', unit: 'UN', minStock: 8 },
+  { name: 'Vinho da Casa Tinto (bag 5L)', sku: 'VIN005', unit: 'UN', minStock: 3 },
+  { name: 'Vinho da Casa Branco (bag 5L)', sku: 'VIN006', unit: 'UN', minStock: 3 },
+
+  // ===== REFRIGERANTES =====
+  { name: 'Coca-Cola Lata 350ml', sku: 'REF001', unit: 'UN', minStock: 96 },
+  { name: 'Guaraná Lata 350ml', sku: 'REF002', unit: 'UN', minStock: 72 },
+  { name: 'Coca-Cola 600ml', sku: 'REF005', unit: 'UN', minStock: 48 },
+  { name: 'Água Mineral 500ml', sku: 'REF007', unit: 'UN', minStock: 96 },
+  { name: 'Água de Coco 330ml', sku: 'REF009', unit: 'UN', minStock: 48 },
+  { name: 'Red Bull 250ml', sku: 'REF010', unit: 'UN', minStock: 36 },
+  { name: 'Polpa de Açaí (1kg)', sku: 'REF013', unit: 'KG', minStock: 10 },
+
+  // ===== CAFÉS E SOBREMESAS =====
+  { name: 'Café em Grãos (1kg)', sku: 'CAF001', unit: 'KG', minStock: 5 },
+  { name: 'Chocolate em Pó (1kg)', sku: 'CAF002', unit: 'KG', minStock: 3 },
+  { name: 'Sorvete Creme (5L)', sku: 'SOB001', unit: 'UN', minStock: 4 },
+  { name: 'Sorvete Chocolate (5L)', sku: 'SOB002', unit: 'UN', minStock: 4 },
+  { name: 'Granulado Belga (500g)', sku: 'SOB004', unit: 'UN', minStock: 5 },
+
+  // ===== EMBALAGENS =====
+  { name: 'Guardanapo de Papel (pct 1000)', sku: 'EMB001', unit: 'PCT', minStock: 10 },
+  { name: 'Copo Descartável 200ml (pct 100)', sku: 'EMB006', unit: 'PCT', minStock: 20 },
+  { name: 'Papel Toalha (rolo)', sku: 'EMB008', unit: 'UN', minStock: 30 },
+
+  // ===== LIMPEZA =====
+  { name: 'Detergente Neutro (5L)', sku: 'LIM001', unit: 'UN', minStock: 5 },
+  { name: 'Álcool 70% (1L)', sku: 'LIM003', unit: 'UN', minStock: 10 },
+  { name: 'Saco de Lixo 100L (pct 100)', sku: 'LIM006', unit: 'PCT', minStock: 5 },
+];
+
+// ============================================
+// FORNECEDORES
+// ============================================
+
+const SUPPLIERS = [
+  { name: 'Frigorífico São Paulo', cnpj: '12.345.678/0001-90', email: 'vendas@frigorificosp.com.br', phone: '(11) 3456-7890', address: 'Rua dos Açougues, 150 - Lapa, São Paulo/SP' },
+  { name: 'Pescados Atlântico', cnpj: '23.456.789/0001-01', email: 'comercial@pescadosatlantico.com.br', phone: '(11) 2345-6789', address: 'Av. do Porto, 800 - Santos/SP' },
+  { name: 'Laticínios Serra da Mantiqueira', cnpj: '34.567.890/0001-12', email: 'pedidos@laticiniosmantiqueira.com.br', phone: '(35) 3456-7890', address: 'Estrada do Leite, km 5 - Serra Negra/MG' },
+  { name: 'CEAGESP - Hortifruti', cnpj: '45.678.901/0001-23', email: 'vendas@ceagesp.gov.br', phone: '(11) 3643-3700', address: 'Av. Dr. Gastão Vidigal, 1946 - Vila Leopoldina, São Paulo/SP' },
+  { name: 'Distribuidora Grãos do Brasil', cnpj: '56.789.012/0001-34', email: 'comercial@graosdobrasil.com.br', phone: '(11) 4567-8901', address: 'Rod. Anhanguera, km 30 - Osasco/SP' },
+  { name: 'Bebidas Premium Distribuidora', cnpj: '67.890.123/0001-45', email: 'vendas@bebidaspremium.com.br', phone: '(11) 5678-9012', address: 'Rua das Bebidas, 500 - Barra Funda, São Paulo/SP' },
+  { name: 'Coca-Cola FEMSA', cnpj: '78.901.234/0001-56', email: 'pedidos@cocacolafemsa.com.br', phone: '0800 727 2020', address: 'Av. das Américas, 3500 - Jundiaí/SP' },
+  { name: 'Embalagens Ecológicas Ltda', cnpj: '89.012.345/0001-67', email: 'vendas@embalagenseco.com.br', phone: '(11) 6789-0123', address: 'Rua Verde, 200 - Guarulhos/SP' },
+];
+
+// ============================================
+// NOMES BRASILEIROS PARA CLIENTES
+// ============================================
+
+const FIRST_NAMES = ['Ana', 'Bruno', 'Carla', 'Daniel', 'Eduardo', 'Fernanda', 'Gabriel', 'Helena', 'Igor', 'Julia', 'Lucas', 'Mariana', 'Nicolas', 'Olivia', 'Pedro', 'Rafaela', 'Samuel', 'Tatiana', 'Victor', 'Yasmin', 'André', 'Beatriz', 'Carlos', 'Diana', 'Felipe', 'Giovanna', 'Henrique', 'Isabella', 'João', 'Karen', 'Leonardo', 'Letícia', 'Marcos', 'Natália', 'Otávio', 'Patrícia', 'Ricardo', 'Sofia', 'Thiago', 'Vanessa'];
+
+const LAST_NAMES = ['Silva', 'Santos', 'Oliveira', 'Souza', 'Rodrigues', 'Ferreira', 'Alves', 'Pereira', 'Lima', 'Gomes', 'Costa', 'Ribeiro', 'Martins', 'Carvalho', 'Almeida', 'Lopes', 'Soares', 'Fernandes', 'Vieira', 'Barbosa', 'Rocha', 'Dias', 'Nascimento', 'Andrade', 'Moreira', 'Nunes', 'Marques', 'Machado', 'Mendes', 'Freitas'];
+
+function generateBrazilianName(): { firstName: string; lastName: string; fullName: string } {
+  const firstName = randomFromArray(FIRST_NAMES);
+  const lastName = randomFromArray(LAST_NAMES);
+  return { firstName, lastName, fullName: `${firstName} ${lastName}` };
+}
+
+function generateEmail(firstName: string, lastName: string): string {
+  const normalizedFirst = firstName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const normalizedLast = lastName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const random = Math.floor(Math.random() * 100);
+  return `${normalizedFirst}.${normalizedLast}${random}@gmail.com`;
+}
+
+function generatePhone(): string {
+  const ddd = randomFromArray(['11', '21', '31', '41', '51', '61', '71', '81', '85', '92']);
+  const prefix = randomBetween(98000, 99999);
+  const suffix = randomBetween(1000, 9999);
+  return `(${ddd}) ${prefix}-${suffix}`;
+}
+
+// ============================================
+// COMENTÁRIOS DE REVIEWS
+// ============================================
+
+const POSITIVE_REVIEWS = [
+  'Excelente! A feijoada estava divina, melhor que a da minha vó! Voltarei com certeza.',
+  'Ambiente super aconchegante e atendimento impecável. O chopp estava gelado na medida!',
+  'A picanha derretia na boca. Preço justo pelo que é servido. Recomendo demais!',
+  'Vim pelo split bill e fiquei pela comida! Muito prático dividir a conta pelo app.',
+  'Primeira vez aqui e já virou meu boteco favorito. Caipirinha sensacional!',
+  'O torresmo é o melhor que já comi em SP. Crocante e sequinho. 10/10!',
+  'Trouxe a família inteira e todo mundo adorou. Porções generosas e saborosas.',
+  'O caldinho de feijão no frio é vida! Perfeito para acompanhar uma cerveja.',
+  'Atendimento nota mil, garçons super atenciosos. O escondidinho é imperdível.',
+  'Ambiente descontraído, comida maravilhosa. O bolinho de bacalhau é espetacular!',
+];
+
+const NEUTRAL_REVIEWS = [
+  'Comida boa, mas o tempo de espera foi um pouco longo no sábado à noite.',
+  'Gostei do ambiente, porém achei o preço um pouco salgado para as porções.',
+  'Atendimento ok, mas poderia ser mais rápido. A comida estava boa.',
+  'Local agradável, mas estava muito cheio. Tivemos que esperar 30 min por mesa.',
+];
+
+const SUGGESTION_CONTENTS = [
+  'Seria legal ter opções de pratos sem glúten no cardápio.',
+  'Poderiam colocar mais tomadas para carregar celular nas mesas.',
+  'Sugestão: criar um combo de casal com entrada + prato + sobremesa.',
+  'O estacionamento poderia ter manobrista nos finais de semana.',
+  'Adoraria ver cervejas artesanais locais no cardápio!',
+  'Que tal um programa de fidelidade? Tipo a cada 10 visitas ganha uma caipirinha.',
+  'Poderiam ter música ao vivo às sextas-feiras.',
+];
+
+// ============================================
+// MAIN SEED FUNCTION
+// ============================================
 
 async function main() {
-  console.log('='.repeat(60));
-  console.log('  TabSync - Database Seed');
-  console.log('  Boteco do Chef - Restaurante Completo');
-  console.log('='.repeat(60));
-  console.log('');
+  console.log('🌱 Iniciando seed ultra-realista do Boteco do Chef...\n');
 
-  // ============================================
-  // CLEANUP - Delete all existing data
-  // ============================================
-  console.log('[1/15] Limpando dados existentes...');
+  // Limpa dados existentes
+  console.log('🧹 Limpando dados existentes...');
+  await prisma.$transaction([
+    prisma.auditLog.deleteMany(),
+    prisma.analyticsEvent.deleteMany(),
+    prisma.npsResponse.deleteMany(),
+    prisma.complaint.deleteMany(),
+    prisma.suggestion.deleteMany(),
+    prisma.review.deleteMany(),
+    prisma.waiterCall.deleteMany(),
+    prisma.splitPayment.deleteMany(),
+    prisma.payment.deleteMany(),
+    prisma.orderItem.deleteMany(),
+    prisma.orderParticipant.deleteMany(),
+    prisma.order.deleteMany(),
+    prisma.tableSessionMember.deleteMany(),
+    prisma.tableSession.deleteMany(),
+    prisma.table.deleteMany(),
+    prisma.menuItemInventory.deleteMany(),
+    prisma.stockEntryItem.deleteMany(),
+    prisma.stockEntry.deleteMany(),
+    prisma.invoiceUpload.deleteMany(),
+    prisma.inventoryItem.deleteMany(),
+    prisma.supplier.deleteMany(),
+    prisma.menuItem.deleteMany(),
+    prisma.menuCategory.deleteMany(),
+    prisma.subscription.deleteMany(),
+    prisma.plan.deleteMany(),
+    prisma.consultantRestaurant.deleteMany(),
+    prisma.consultant.deleteMany(),
+    prisma.staff.deleteMany(),
+    prisma.restaurant.deleteMany(),
+    prisma.user.deleteMany(),
+  ]);
+  console.log('✅ Dados limpos!\n');
 
-  await prisma.waiterCall.deleteMany();
-  await prisma.npsResponse.deleteMany();
-  await prisma.complaint.deleteMany();
-  await prisma.suggestion.deleteMany();
-  await prisma.review.deleteMany();
-  await prisma.auditLog.deleteMany();
-  await prisma.analyticsEvent.deleteMany();
-  await prisma.stockEntryItem.deleteMany();
-  await prisma.stockEntry.deleteMany();
-  await prisma.invoiceUpload.deleteMany();
-  await prisma.menuItemInventory.deleteMany();
-  await prisma.inventoryItem.deleteMany();
-  await prisma.supplier.deleteMany();
-  await prisma.splitPayment.deleteMany();
-  await prisma.payment.deleteMany();
-  await prisma.orderItem.deleteMany();
-  await prisma.orderParticipant.deleteMany();
-  await prisma.order.deleteMany();
-  await prisma.tableSessionMember.deleteMany();
-  await prisma.tableSession.deleteMany();
-  await prisma.table.deleteMany();
-  await prisma.menuItem.deleteMany();
-  await prisma.menuCategory.deleteMany();
-  await prisma.subscription.deleteMany();
-  await prisma.plan.deleteMany();
-  await prisma.consultantRestaurant.deleteMany();
-  await prisma.consultant.deleteMany();
-  await prisma.staff.deleteMany();
-  await prisma.restaurant.deleteMany();
-  await prisma.user.deleteMany();
+  // ========================================
+  // 1. CRIAR PLANOS
+  // ========================================
+  console.log('📋 Criando planos de assinatura...');
+  const plans = await Promise.all([
+    prisma.plan.create({
+      data: {
+        name: 'Starter', slug: 'starter', description: 'Ideal para pequenos estabelecimentos',
+        price: 0, billingCycle: 'MONTHLY', trialDays: 14, maxTables: 5, maxMenuItems: 30, maxStaff: 3, maxOrders: 100,
+        platformFeePercent: 3.5, features: ['basic_menu', 'qr_code', 'basic_orders'], displayOrder: 1,
+      },
+    }),
+    prisma.plan.create({
+      data: {
+        name: 'Professional', slug: 'professional', description: 'Para restaurantes em crescimento',
+        price: 199.90, billingCycle: 'MONTHLY', trialDays: 14, maxTables: 20, maxMenuItems: 100, maxStaff: 10, maxOrders: 500,
+        platformFeePercent: 2.5, features: ['basic_menu', 'qr_code', 'basic_orders', 'split_bill', 'analytics', 'inventory'], displayOrder: 2,
+      },
+    }),
+    prisma.plan.create({
+      data: {
+        name: 'Enterprise', slug: 'enterprise', description: 'Solução completa para grandes operações',
+        price: 499.90, billingCycle: 'MONTHLY', trialDays: 30, maxTables: null, maxMenuItems: null, maxStaff: null, maxOrders: null,
+        platformFeePercent: 1.5, features: ['basic_menu', 'qr_code', 'basic_orders', 'split_bill', 'analytics', 'inventory', 'ocr_invoice', 'api_access'], displayOrder: 3,
+      },
+    }),
+  ]);
+  console.log(`✅ ${plans.length} planos criados!\n`);
 
-  console.log('   Dados limpos com sucesso!');
+  // ========================================
+  // 2. CRIAR USUÁRIOS DO SISTEMA
+  // ========================================
+  console.log('👥 Criando usuários do sistema...');
+  const passwordHash = await bcrypt.hash('Admin123!', 12);
 
-  // ============================================
-  // USERS - Create all user types
-  // ============================================
-  console.log('[2/15] Criando usuarios...');
-
-  // Hash passwords
-  const superAdminHash = await bcrypt.hash('Admin123!', 10);
-  const consultantHash = await bcrypt.hash('Consultor123!', 10);
-  const ownerHash = await bcrypt.hash('Dono123!', 10);
-  const waiterHash = await bcrypt.hash('Garcom123!', 10);
-  const kitchenHash = await bcrypt.hash('Cozinha123!', 10);
-  const customerHash = await bcrypt.hash('Cliente123!', 10);
-
-  // Super Admin
   const superAdmin = await prisma.user.create({
-    data: {
-      email: 'admin@tabsync.com',
-      passwordHash: superAdminHash,
-      fullName: 'Administrador TabSync',
-      phone: '+55 11 99999-0001',
-      role: UserRole.SUPER_ADMIN,
-      emailVerified: true,
-      avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200',
-    },
+    data: { email: 'admin@tabsync.com', passwordHash, fullName: 'Administrador TabSync', phone: '(11) 99999-0001', role: 'SUPER_ADMIN', emailVerified: true },
   });
 
-  // Consultant
-  const consultantUser = await prisma.user.create({
-    data: {
-      email: 'consultor@tabsync.com',
-      passwordHash: consultantHash,
-      fullName: 'Roberto Mendes Silva',
-      phone: '+55 11 98765-4321',
-      role: UserRole.CONSULTANT,
-      emailVerified: true,
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
-    },
+  const consultorPassword = await bcrypt.hash('Consultor123!', 12);
+  const consultor1 = await prisma.user.create({
+    data: { email: 'maria.consultora@tabsync.com', passwordHash: consultorPassword, fullName: 'Maria Silva - Consultora', phone: '(11) 99999-0002', role: 'CONSULTANT', emailVerified: true },
   });
 
-  // Restaurant Owner
+  await prisma.consultant.create({
+    data: { userId: consultor1.id, commissionPercent: 10, totalOnboardings: 15, totalEarnings: 8500, isActive: true },
+  });
+
+  const ownerPassword = await bcrypt.hash('Dono123!', 12);
   const owner = await prisma.user.create({
-    data: {
-      email: 'dono@botecodochef.com.br',
-      passwordHash: ownerHash,
-      fullName: 'Antonio Carlos Ferreira',
-      phone: '+55 11 99888-7777',
-      role: UserRole.RESTAURANT_OWNER,
-      emailVerified: true,
-      avatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200',
-    },
+    data: { email: 'dono@botecodochef.com.br', passwordHash: ownerPassword, fullName: 'Carlos Eduardo Mendes', phone: '(11) 98765-4321', role: 'RESTAURANT_OWNER', emailVerified: true },
   });
 
-  // Waiters
-  const waiter1 = await prisma.user.create({
-    data: {
-      email: 'garcom1@botecodochef.com.br',
-      passwordHash: waiterHash,
-      fullName: 'Carlos Eduardo Santos',
-      phone: '+55 11 97777-1111',
-      role: UserRole.WAITER,
-      emailVerified: true,
-    },
-  });
+  console.log('✅ Usuários do sistema criados!\n');
 
-  const waiter2 = await prisma.user.create({
-    data: {
-      email: 'garcom2@botecodochef.com.br',
-      passwordHash: waiterHash,
-      fullName: 'Fernanda Oliveira Lima',
-      phone: '+55 11 97777-2222',
-      role: UserRole.WAITER,
-      emailVerified: true,
-    },
-  });
-
-  const waiter3 = await prisma.user.create({
-    data: {
-      email: 'garcom3@botecodochef.com.br',
-      passwordHash: waiterHash,
-      fullName: 'Ricardo Almeida Costa',
-      phone: '+55 11 97777-3333',
-      role: UserRole.WAITER,
-      emailVerified: true,
-    },
-  });
-
-  // Kitchen Staff
-  const kitchen1 = await prisma.user.create({
-    data: {
-      email: 'cozinha1@botecodochef.com.br',
-      passwordHash: kitchenHash,
-      fullName: 'Jose Maria Pereira',
-      phone: '+55 11 96666-1111',
-      role: UserRole.KITCHEN,
-      emailVerified: true,
-    },
-  });
-
-  const kitchen2 = await prisma.user.create({
-    data: {
-      email: 'cozinha2@botecodochef.com.br',
-      passwordHash: kitchenHash,
-      fullName: 'Ana Paula Rodrigues',
-      phone: '+55 11 96666-2222',
-      role: UserRole.KITCHEN,
-      emailVerified: true,
-    },
-  });
-
-  // Customers
-  const customer1 = await prisma.user.create({
-    data: {
-      email: 'cliente1@gmail.com',
-      passwordHash: customerHash,
-      fullName: 'Marcos Vinicius Silva',
-      phone: '+55 11 95555-1111',
-      role: UserRole.CUSTOMER,
-      emailVerified: true,
-    },
-  });
-
-  const customer2 = await prisma.user.create({
-    data: {
-      email: 'cliente2@gmail.com',
-      passwordHash: customerHash,
-      fullName: 'Juliana Beatriz Souza',
-      phone: '+55 11 95555-2222',
-      role: UserRole.CUSTOMER,
-      emailVerified: true,
-    },
-  });
-
-  const customer3 = await prisma.user.create({
-    data: {
-      email: 'cliente3@gmail.com',
-      passwordHash: customerHash,
-      fullName: 'Pedro Henrique Costa',
-      phone: '+55 11 95555-3333',
-      role: UserRole.CUSTOMER,
-      emailVerified: true,
-    },
-  });
-
-  const customer4 = await prisma.user.create({
-    data: {
-      email: 'cliente4@gmail.com',
-      passwordHash: customerHash,
-      fullName: 'Camila Rodrigues Ferreira',
-      phone: '+55 11 95555-4444',
-      role: UserRole.CUSTOMER,
-      emailVerified: true,
-    },
-  });
-
-  const customer5 = await prisma.user.create({
-    data: {
-      email: 'cliente5@gmail.com',
-      passwordHash: customerHash,
-      fullName: 'Lucas Gabriel Oliveira',
-      phone: '+55 11 95555-5555',
-      role: UserRole.CUSTOMER,
-      emailVerified: true,
-    },
-  });
-
-  console.log('   12 usuarios criados!');
-
-  // ============================================
-  // PLANS - Subscription Plans
-  // ============================================
-  console.log('[3/15] Criando planos de assinatura...');
-
-  const planBasic = await prisma.plan.create({
-    data: {
-      name: 'Basic',
-      slug: 'basic',
-      description: 'Plano ideal para restaurantes pequenos. Inclui funcionalidades essenciais para gestao de pedidos e pagamentos.',
-      price: 99.9,
-      billingCycle: 'MONTHLY',
-      trialDays: 14,
-      maxTables: 10,
-      maxMenuItems: 50,
-      maxStaff: 5,
-      maxOrders: 500,
-      platformFeePercent: 3.5,
-      features: JSON.parse(
-        JSON.stringify(['split_bill', 'basic_analytics', 'qr_code_menu', 'email_support'])
-      ),
-      isActive: true,
-      displayOrder: 1,
-    },
-  });
-
-  const planPro = await prisma.plan.create({
-    data: {
-      name: 'Pro',
-      slug: 'pro',
-      description: 'Plano completo para restaurantes em crescimento. Todas as funcionalidades do Basic mais recursos avancados.',
-      price: 249.9,
-      billingCycle: 'MONTHLY',
-      trialDays: 14,
-      maxTables: 30,
-      maxMenuItems: 200,
-      maxStaff: 15,
-      maxOrders: 2000,
-      platformFeePercent: 2.5,
-      features: JSON.parse(
-        JSON.stringify([
-          'split_bill',
-          'advanced_analytics',
-          'qr_code_menu',
-          'inventory_management',
-          'ocr_invoice',
-          'priority_support',
-          'custom_branding',
-          'api_access',
-        ])
-      ),
-      isActive: true,
-      displayOrder: 2,
-    },
-  });
-
-  const planEnterprise = await prisma.plan.create({
-    data: {
-      name: 'Enterprise',
-      slug: 'enterprise',
-      description: 'Solucao completa para redes de restaurantes. Recursos ilimitados e suporte dedicado 24/7.',
-      price: 599.9,
-      billingCycle: 'MONTHLY',
-      trialDays: 30,
-      maxTables: null, // unlimited
-      maxMenuItems: null, // unlimited
-      maxStaff: null, // unlimited
-      maxOrders: null, // unlimited
-      platformFeePercent: 1.5,
-      features: JSON.parse(
-        JSON.stringify([
-          'split_bill',
-          'enterprise_analytics',
-          'qr_code_menu',
-          'inventory_management',
-          'ocr_invoice',
-          'dedicated_support',
-          'white_label',
-          'api_access',
-          'multi_location',
-          'custom_integrations',
-          'sla_guarantee',
-        ])
-      ),
-      isActive: true,
-      displayOrder: 3,
-    },
-  });
-
-  console.log('   3 planos criados!');
-
-  // ============================================
-  // RESTAURANT - Boteco do Chef
-  // ============================================
-  console.log('[4/15] Criando restaurante Boteco do Chef...');
-
+  // ========================================
+  // 3. CRIAR RESTAURANTE
+  // ========================================
+  console.log('🍽️ Criando Boteco do Chef...');
   const restaurant = await prisma.restaurant.create({
     data: {
       ownerId: owner.id,
       name: 'Boteco do Chef',
       slug: 'boteco-do-chef',
-      description:
-        'O melhor boteco de Sao Paulo! Ambiente aconchegante, porcoes generosas e drinks especiais. Venha experimentar nossas famosas porcoes de calabresa acebolada, batata frita com cheddar e bacon, e nossa selecao exclusiva de cervejas artesanais. Happy Hour todos os dias das 17h as 20h!',
-      logoUrl: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=200',
+      description: 'O autêntico boteco brasileiro com o melhor da culinária nacional. Ambiente descontraído, cerveja gelada e aquele clima de interior que você ama!',
+      logoUrl: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400',
       coverUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200',
-      addressStreet: 'Rua Oscar Freire, 1234',
-      addressCity: 'Sao Paulo',
+      addressStreet: 'Rua Augusta, 1500',
+      addressCity: 'São Paulo',
       addressState: 'SP',
-      addressZip: '01426-001',
-      addressCountry: 'Brasil',
-      phone: '+55 11 3063-4567',
+      addressZip: '01304-001',
+      phone: '(11) 3456-7890',
       email: 'contato@botecodochef.com.br',
       isActive: true,
       acceptsOrders: true,
-      currency: 'BRL',
-      timezone: 'America/Sao_Paulo',
       operatingHours: {
         monday: { open: '17:00', close: '00:00' },
         tuesday: { open: '17:00', close: '00:00' },
-        wednesday: { open: '17:00', close: '01:00' },
+        wednesday: { open: '17:00', close: '00:00' },
         thursday: { open: '17:00', close: '01:00' },
         friday: { open: '17:00', close: '02:00' },
         saturday: { open: '12:00', close: '02:00' },
@@ -393,2246 +579,491 @@ async function main() {
     },
   });
 
-  console.log('   Restaurante criado!');
-
-  // ============================================
-  // CONSULTANT - Link to restaurant
-  // ============================================
-  console.log('[5/15] Configurando consultor...');
-
-  const consultant = await prisma.consultant.create({
-    data: {
-      userId: consultantUser.id,
-      commissionPercent: 5.0,
-      totalOnboardings: 12,
-      totalEarnings: 14500.0,
-      isActive: true,
-    },
-  });
-
-  await prisma.consultantRestaurant.create({
-    data: {
-      consultantId: consultant.id,
-      restaurantId: restaurant.id,
-      onboardedAt: daysAgo(45),
-    },
-  });
-
-  console.log('   Consultor vinculado!');
-
-  // ============================================
-  // SUBSCRIPTION - Pro Plan Active
-  // ============================================
-  console.log('[6/15] Criando assinatura...');
-
   await prisma.subscription.create({
     data: {
       restaurantId: restaurant.id,
-      planId: planPro.id,
-      status: SubscriptionStatus.ACTIVE,
-      currentPeriodStart: daysAgo(15),
-      currentPeriodEnd: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-      gatewayCustomerId: 'cus_' + generateUUID().substring(0, 14),
-      gatewaySubscriptionId: 'sub_' + generateUUID().substring(0, 14),
+      planId: plans[1].id,
+      status: 'ACTIVE',
+      currentPeriodStart: new Date(new Date().setDate(1)),
+      currentPeriodEnd: new Date(new Date().setMonth(new Date().getMonth() + 1, 0)),
     },
   });
 
-  console.log('   Assinatura Pro ativa!');
+  const consultant = await prisma.consultant.findUnique({ where: { userId: consultor1.id } });
+  if (consultant) {
+    await prisma.consultantRestaurant.create({
+      data: { consultantId: consultant.id, restaurantId: restaurant.id, onboardedAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) },
+    });
+  }
 
-  // ============================================
-  // STAFF - Waiters and Kitchen
-  // ============================================
-  console.log('[7/15] Criando equipe (staff)...');
+  console.log(`✅ Restaurante "${restaurant.name}" criado!\n`);
 
-  await prisma.staff.createMany({
-    data: [
-      {
-        userId: waiter1.id,
-        restaurantId: restaurant.id,
-        role: UserRole.WAITER,
-        pin: '1234',
-        isActive: true,
-      },
-      {
-        userId: waiter2.id,
-        restaurantId: restaurant.id,
-        role: UserRole.WAITER,
-        pin: '2345',
-        isActive: true,
-      },
-      {
-        userId: waiter3.id,
-        restaurantId: restaurant.id,
-        role: UserRole.WAITER,
-        pin: '3456',
-        isActive: true,
-      },
-      {
-        userId: kitchen1.id,
-        restaurantId: restaurant.id,
-        role: UserRole.KITCHEN,
-        pin: '5678',
-        isActive: true,
-      },
-      {
-        userId: kitchen2.id,
-        restaurantId: restaurant.id,
-        role: UserRole.KITCHEN,
-        pin: '6789',
-        isActive: true,
-      },
-    ],
-  });
+  // ========================================
+  // 4. CRIAR STAFF
+  // ========================================
+  console.log('👨‍🍳 Criando equipe do restaurante...');
+  const staffPassword = await bcrypt.hash('Staff123!', 12);
 
-  console.log('   5 funcionarios criados!');
+  const waiters = await Promise.all([
+    prisma.user.create({ data: { email: 'pedro.garcom@botecodochef.com.br', passwordHash: staffPassword, fullName: 'Pedro Henrique Souza', phone: '(11) 98111-1111', role: 'WAITER', emailVerified: true } }),
+    prisma.user.create({ data: { email: 'ana.garcoca@botecodochef.com.br', passwordHash: staffPassword, fullName: 'Ana Paula Costa', phone: '(11) 98222-2222', role: 'WAITER', emailVerified: true } }),
+    prisma.user.create({ data: { email: 'marcos.garcom@botecodochef.com.br', passwordHash: staffPassword, fullName: 'Marcos Vinícius Lima', phone: '(11) 98333-3333', role: 'WAITER', emailVerified: true } }),
+  ]);
 
-  // ============================================
-  // TABLES - 18 tables with varied capacities
-  // ============================================
-  console.log('[8/15] Criando mesas...');
+  const kitchenStaff = await Promise.all([
+    prisma.user.create({ data: { email: 'chef.roberto@botecodochef.com.br', passwordHash: staffPassword, fullName: 'Roberto Carlos Almeida', phone: '(11) 98555-5555', role: 'KITCHEN', emailVerified: true } }),
+    prisma.user.create({ data: { email: 'sous.fernanda@botecodochef.com.br', passwordHash: staffPassword, fullName: 'Fernanda Rodrigues', phone: '(11) 98666-6666', role: 'KITCHEN', emailVerified: true } }),
+  ]);
 
-  const tableData: Array<{ number: number; name: string | null; capacity: number }> = [
-    { number: 1, name: 'Varanda 1', capacity: 2 },
-    { number: 2, name: 'Varanda 2', capacity: 2 },
-    { number: 3, name: 'Varanda 3', capacity: 4 },
-    { number: 4, name: 'Varanda 4', capacity: 4 },
-    { number: 5, name: null, capacity: 4 },
-    { number: 6, name: null, capacity: 4 },
-    { number: 7, name: null, capacity: 4 },
-    { number: 8, name: null, capacity: 6 },
-    { number: 9, name: null, capacity: 6 },
-    { number: 10, name: null, capacity: 6 },
-    { number: 11, name: 'Reservado VIP 1', capacity: 8 },
-    { number: 12, name: 'Reservado VIP 2', capacity: 8 },
-    { number: 13, name: null, capacity: 4 },
-    { number: 14, name: null, capacity: 4 },
-    { number: 15, name: 'Familia', capacity: 10 },
-    { number: 16, name: null, capacity: 4 },
-    { number: 17, name: null, capacity: 4 },
-    { number: 18, name: 'Balcao', capacity: 6 },
+  for (const waiter of waiters) {
+    await prisma.staff.create({ data: { userId: waiter.id, restaurantId: restaurant.id, role: 'WAITER', pin: String(randomBetween(1000, 9999)), isActive: true } });
+  }
+  for (const kitchen of kitchenStaff) {
+    await prisma.staff.create({ data: { userId: kitchen.id, restaurantId: restaurant.id, role: 'KITCHEN', pin: String(randomBetween(1000, 9999)), isActive: true } });
+  }
+
+  console.log(`✅ ${waiters.length} garçons e ${kitchenStaff.length} cozinheiros criados!\n`);
+
+  // ========================================
+  // 5. CRIAR MESAS
+  // ========================================
+  console.log('🪑 Criando mesas...');
+  const tableConfigs = [
+    { number: 1, name: 'Mesa 1 - Entrada', capacity: 4 },
+    { number: 2, name: 'Mesa 2 - Entrada', capacity: 4 },
+    { number: 3, name: 'Mesa 3 - Entrada', capacity: 2 },
+    { number: 4, name: 'Mesa 4 - Centro', capacity: 6 },
+    { number: 5, name: 'Mesa 5 - Centro', capacity: 6 },
+    { number: 6, name: 'Mesa 6 - Centro', capacity: 4 },
+    { number: 7, name: 'Mesa 7 - Centro', capacity: 4 },
+    { number: 8, name: 'Mesa 8 - Fundo', capacity: 8 },
+    { number: 9, name: 'Mesa 9 - Fundo', capacity: 8 },
+    { number: 10, name: 'Mesa 10 - Fundo', capacity: 4 },
+    { number: 11, name: 'Varanda 1', capacity: 4 },
+    { number: 12, name: 'Varanda 2', capacity: 4 },
+    { number: 13, name: 'Varanda 3', capacity: 6 },
+    { number: 14, name: 'Varanda 4', capacity: 2 },
+    { number: 15, name: 'Balcão 1', capacity: 2 },
+    { number: 16, name: 'Balcão 2', capacity: 2 },
+    { number: 17, name: 'Balcão 3', capacity: 2 },
+    { number: 18, name: 'Reservado', capacity: 12 },
   ];
 
-  const tables: Array<{ id: string; number: number }> = [];
+  const tables = await Promise.all(
+    tableConfigs.map((config) =>
+      prisma.table.create({
+        data: { restaurantId: restaurant.id, number: config.number, name: config.name, capacity: config.capacity, qrCode: generateQrCode(config.number, restaurant.slug), isActive: true },
+      })
+    )
+  );
+  console.log(`✅ ${tables.length} mesas criadas!\n`);
 
-  for (const t of tableData) {
-    const table = await prisma.table.create({
-      data: {
-        restaurantId: restaurant.id,
-        number: t.number,
-        name: t.name,
-        capacity: t.capacity,
-        qrCode: generateQRCode('boteco-do-chef', t.number),
-        isActive: true,
-      },
+  // ========================================
+  // 6. CRIAR CATEGORIAS E ITENS DO MENU
+  // ========================================
+  console.log('📜 Criando cardápio completo...');
+  const categoryMap = new Map<string, string>();
+
+  for (const cat of MENU_CATEGORIES) {
+    const category = await prisma.menuCategory.create({
+      data: { restaurantId: restaurant.id, name: cat.name, description: cat.description, displayOrder: cat.order, isActive: true },
     });
-    tables.push({ id: table.id, number: table.number });
+    categoryMap.set(cat.name, category.id);
   }
 
-  console.log('   18 mesas criadas!');
+  const menuItemsCreated: Array<{ id: string; name: string; price: number; categoryName: string }> = [];
 
-  // ============================================
-  // MENU CATEGORIES
-  // ============================================
-  console.log('[9/15] Criando cardapio...');
+  for (let i = 0; i < MENU_ITEMS.length; i++) {
+    const item = MENU_ITEMS[i];
+    const categoryId = categoryMap.get(item.category);
 
-  const catPorcoes = await prisma.menuCategory.create({
-    data: {
-      restaurantId: restaurant.id,
-      name: 'Porcoes',
-      description: 'Porcoes generosas para compartilhar',
-      displayOrder: 1,
-      isActive: true,
-    },
-  });
+    const menuItem = await prisma.menuItem.create({
+      data: { restaurantId: restaurant.id, categoryId: categoryId ?? null, name: item.name, description: item.description, price: item.price, calories: item.calories, allergens: item.allergens, isAvailable: true, displayOrder: i + 1 },
+    });
 
-  const catPetiscos = await prisma.menuCategory.create({
-    data: {
-      restaurantId: restaurant.id,
-      name: 'Petiscos',
-      description: 'Deliciosos petiscos para beliscar',
-      displayOrder: 2,
-      isActive: true,
-    },
-  });
-
-  const catPratosPrincipais = await prisma.menuCategory.create({
-    data: {
-      restaurantId: restaurant.id,
-      name: 'Pratos Principais',
-      description: 'Pratos completos para uma refeicao',
-      displayOrder: 3,
-      isActive: true,
-    },
-  });
-
-  const catCervejasArtesanais = await prisma.menuCategory.create({
-    data: {
-      restaurantId: restaurant.id,
-      name: 'Cervejas Artesanais',
-      description: 'Selecao especial de cervejas artesanais',
-      displayOrder: 4,
-      isActive: true,
-    },
-  });
-
-  const catCervejasComerciais = await prisma.menuCategory.create({
-    data: {
-      restaurantId: restaurant.id,
-      name: 'Cervejas Comerciais',
-      description: 'Cervejas tradicionais bem geladas',
-      displayOrder: 5,
-      isActive: true,
-    },
-  });
-
-  const catDrinks = await prisma.menuCategory.create({
-    data: {
-      restaurantId: restaurant.id,
-      name: 'Drinks e Coqueteis',
-      description: 'Drinks classicos e autorais',
-      displayOrder: 6,
-      isActive: true,
-    },
-  });
-
-  const catBebidasNaoAlcoolicas = await prisma.menuCategory.create({
-    data: {
-      restaurantId: restaurant.id,
-      name: 'Bebidas Nao Alcoolicas',
-      description: 'Refrigerantes, sucos e aguas',
-      displayOrder: 7,
-      isActive: true,
-    },
-  });
-
-  const catSobremesas = await prisma.menuCategory.create({
-    data: {
-      restaurantId: restaurant.id,
-      name: 'Sobremesas',
-      description: 'Docuras para finalizar',
-      displayOrder: 8,
-      isActive: true,
-    },
-  });
-
-  // ============================================
-  // MENU ITEMS - 50+ items
-  // ============================================
-
-  // PORCOES (10 items)
-  const menuItems = await prisma.menuItem.createManyAndReturn({
-    data: [
-      // PORCOES
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPorcoes.id,
-        name: 'Batata Frita Tradicional',
-        description: 'Porcao generosa de batata frita crocante com sal e oregano',
-        imageUrl: 'https://images.unsplash.com/photo-1630384060421-cb20d0e0649d?w=400',
-        price: 32.9,
-        calories: 450,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 1,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPorcoes.id,
-        name: 'Batata com Cheddar e Bacon',
-        description: 'Batata frita coberta com cheddar cremoso e bacon crocante',
-        imageUrl: 'https://images.unsplash.com/photo-1585109649139-366815a0d713?w=400',
-        price: 45.9,
-        calories: 720,
-        allergens: ['lactose'],
-        isAvailable: true,
-        displayOrder: 2,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPorcoes.id,
-        name: 'Calabresa Acebolada',
-        description: 'Linguica calabresa grelhada com cebolas douradas, limao e farofa',
-        imageUrl: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=400',
-        price: 52.9,
-        calories: 580,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 3,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPorcoes.id,
-        name: 'Frango a Passarinho',
-        description: 'Pedacos de frango empanados e fritos, servidos com limao e molho',
-        imageUrl: 'https://images.unsplash.com/photo-1562967914-608f82629710?w=400',
-        price: 48.9,
-        calories: 650,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 4,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPorcoes.id,
-        name: 'Isca de Peixe',
-        description: 'Iscas de tilapia empanadas e fritas com molho tartaro',
-        imageUrl: 'https://images.unsplash.com/photo-1580217593608-61931cefc821?w=400',
-        price: 56.9,
-        calories: 520,
-        allergens: ['gluten', 'peixe'],
-        isAvailable: true,
-        displayOrder: 5,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPorcoes.id,
-        name: 'Mandioca Frita',
-        description: 'Mandioca frita crocante por fora e macia por dentro',
-        imageUrl: 'https://images.unsplash.com/photo-1619221882220-947b3d3c8861?w=400',
-        price: 28.9,
-        calories: 380,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 6,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPorcoes.id,
-        name: 'Provolone a Milanesa',
-        description: 'Fatias de provolone empanadas e fritas, servidas com geleia de pimenta',
-        imageUrl: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=400',
-        price: 49.9,
-        calories: 480,
-        allergens: ['gluten', 'lactose'],
-        isAvailable: true,
-        displayOrder: 7,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPorcoes.id,
-        name: 'Polenta Frita',
-        description: 'Palitos de polenta fritos ate dourar, acompanha molho de gorgonzola',
-        imageUrl: 'https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?w=400',
-        price: 34.9,
-        calories: 420,
-        allergens: ['lactose'],
-        isAvailable: true,
-        displayOrder: 8,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPorcoes.id,
-        name: 'Dadinho de Tapioca',
-        description: 'Cubos de tapioca com queijo coalho, acompanha geleia de pimenta',
-        imageUrl: 'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=400',
-        price: 38.9,
-        calories: 350,
-        allergens: ['lactose'],
-        isAvailable: true,
-        displayOrder: 9,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPorcoes.id,
-        name: 'Torresmo de Rolo',
-        description: 'Torresmo crocante cortado em cubos, servido com limao',
-        imageUrl: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=400',
-        price: 44.9,
-        calories: 680,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 10,
-      },
-
-      // PETISCOS (10 items)
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPetiscos.id,
-        name: 'Bolinho de Bacalhau (6 un)',
-        description: 'Tradicionais bolinhos de bacalhau fritos, crocantes por fora',
-        imageUrl: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=400',
-        price: 42.9,
-        calories: 320,
-        allergens: ['gluten', 'peixe', 'ovos'],
-        isAvailable: true,
-        displayOrder: 1,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPetiscos.id,
-        name: 'Coxinha (6 un)',
-        description: 'Coxinhas de frango desfiado cremosas e crocantes',
-        imageUrl: 'https://images.unsplash.com/photo-1630409346699-79a3c9521f15?w=400',
-        price: 36.9,
-        calories: 480,
-        allergens: ['gluten', 'lactose'],
-        isAvailable: true,
-        displayOrder: 2,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPetiscos.id,
-        name: 'Pastel de Carne (4 un)',
-        description: 'Pasteis de carne moida temperada, fritos na hora',
-        imageUrl: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=400',
-        price: 32.9,
-        calories: 450,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 3,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPetiscos.id,
-        name: 'Pastel de Queijo (4 un)',
-        description: 'Pasteis recheados com queijo mussarela derretido',
-        imageUrl: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=400',
-        price: 29.9,
-        calories: 420,
-        allergens: ['gluten', 'lactose'],
-        isAvailable: true,
-        displayOrder: 4,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPetiscos.id,
-        name: 'Quibe Frito (6 un)',
-        description: 'Quibes de carne bovina com triguilho, fritos ate dourar',
-        imageUrl: 'https://images.unsplash.com/photo-1579888944880-d98341245702?w=400',
-        price: 38.9,
-        calories: 380,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 5,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPetiscos.id,
-        name: 'Empada de Frango (4 un)',
-        description: 'Empadas caseiras com recheio cremoso de frango',
-        imageUrl: 'https://images.unsplash.com/photo-1612187146555-6e0eb06e4bb5?w=400',
-        price: 28.9,
-        calories: 360,
-        allergens: ['gluten', 'lactose'],
-        isAvailable: true,
-        displayOrder: 6,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPetiscos.id,
-        name: 'Carpaccio de Carne',
-        description: 'Finas fatias de carne crua com molho mostarda e alcaparras',
-        imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400',
-        price: 54.9,
-        calories: 280,
-        allergens: ['mostarda'],
-        isAvailable: true,
-        displayOrder: 7,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPetiscos.id,
-        name: 'Bruschetta Italiana (4 un)',
-        description: 'Pao italiano grelhado com tomate, manjericao e azeite',
-        imageUrl: 'https://images.unsplash.com/photo-1572695157366-5e585ab2b69f?w=400',
-        price: 26.9,
-        calories: 220,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 8,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPetiscos.id,
-        name: 'Tabua de Frios',
-        description: 'Selecao de queijos, presunto, salame, azeitonas e torradas',
-        imageUrl: 'https://images.unsplash.com/photo-1626200419199-391ae4be7a41?w=400',
-        price: 68.9,
-        calories: 550,
-        allergens: ['gluten', 'lactose'],
-        isAvailable: true,
-        displayOrder: 9,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPetiscos.id,
-        name: 'Aneis de Cebola',
-        description: 'Aneis de cebola empanados e fritos, servidos com molho especial',
-        imageUrl: 'https://images.unsplash.com/photo-1639024471283-03518883512d?w=400',
-        price: 32.9,
-        calories: 380,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 10,
-      },
-
-      // PRATOS PRINCIPAIS (8 items)
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPratosPrincipais.id,
-        name: 'Picanha na Chapa (400g)',
-        description: 'Picanha grelhada na chapa com arroz, farofa, vinagrete e batatas',
-        imageUrl: 'https://images.unsplash.com/photo-1594041680534-e8c8cdebd659?w=400',
-        price: 89.9,
-        calories: 850,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 1,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPratosPrincipais.id,
-        name: 'Costela no Bafo',
-        description: 'Costela bovina cozida lentamente, desfiada, com mandioca e arroz',
-        imageUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400',
-        price: 78.9,
-        calories: 920,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 2,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPratosPrincipais.id,
-        name: 'Frango a Parmegiana',
-        description: 'File de frango empanado com molho de tomate, queijo derretido e arroz',
-        imageUrl: 'https://images.unsplash.com/photo-1632778149955-e80f8ceca2e8?w=400',
-        price: 58.9,
-        calories: 780,
-        allergens: ['gluten', 'lactose'],
-        isAvailable: true,
-        displayOrder: 3,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPratosPrincipais.id,
-        name: 'File a Oswaldo Aranha',
-        description: 'File mignon grelhado com alho frito, arroz, farofa e batatas',
-        imageUrl: 'https://images.unsplash.com/photo-1600891964092-4316c288032e?w=400',
-        price: 94.9,
-        calories: 820,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 4,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPratosPrincipais.id,
-        name: 'Escondidinho de Carne Seca',
-        description: 'Pure de mandioca com carne seca desfiada, gratinado com queijo',
-        imageUrl: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=400',
-        price: 52.9,
-        calories: 680,
-        allergens: ['lactose'],
-        isAvailable: true,
-        displayOrder: 5,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPratosPrincipais.id,
-        name: 'Moqueca de Peixe',
-        description: 'Peixe cozido em leite de coco, dende, pimentoes e coentro, com arroz',
-        imageUrl: 'https://images.unsplash.com/photo-1535140728325-a4d3707eee61?w=400',
-        price: 72.9,
-        calories: 580,
-        allergens: ['peixe'],
-        isAvailable: true,
-        displayOrder: 6,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPratosPrincipais.id,
-        name: 'Risoto de Camarao',
-        description: 'Risoto cremoso com camaroes, tomate seco e rucula',
-        imageUrl: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=400',
-        price: 76.9,
-        calories: 620,
-        allergens: ['lactose', 'crustaceos'],
-        isAvailable: true,
-        displayOrder: 7,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catPratosPrincipais.id,
-        name: 'Feijoada Completa',
-        description: 'Feijoada tradicional com arroz, couve, farofa, torresmo e laranja (sab/dom)',
-        imageUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400',
-        price: 68.9,
-        calories: 980,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 8,
-      },
-
-      // CERVEJAS ARTESANAIS (6 items)
-      {
-        restaurantId: restaurant.id,
-        categoryId: catCervejasArtesanais.id,
-        name: 'IPA Colorado (500ml)',
-        description: 'Cerveja IPA brasileira com notas citricas e amargor equilibrado',
-        imageUrl: 'https://images.unsplash.com/photo-1535958636474-b021ee887b13?w=400',
-        price: 28.9,
-        calories: 180,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 1,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catCervejasArtesanais.id,
-        name: 'Weiss Eisenbahn (500ml)',
-        description: 'Cerveja de trigo com notas de banana e cravo',
-        imageUrl: 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=400',
-        price: 26.9,
-        calories: 170,
-        allergens: ['gluten', 'trigo'],
-        isAvailable: true,
-        displayOrder: 2,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catCervejasArtesanais.id,
-        name: 'Pilsen Wals (500ml)',
-        description: 'Pilsen artesanal leve e refrescante com lupulo floral',
-        imageUrl: 'https://images.unsplash.com/photo-1618885472179-5e474019f2a9?w=400',
-        price: 24.9,
-        calories: 150,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 3,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catCervejasArtesanais.id,
-        name: 'Stout Baden Baden (500ml)',
-        description: 'Cerveja escura com notas de cafe e chocolate',
-        imageUrl: 'https://images.unsplash.com/photo-1514828260103-1e9bf9a58446?w=400',
-        price: 29.9,
-        calories: 200,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 4,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catCervejasArtesanais.id,
-        name: 'APA Bodebrown (500ml)',
-        description: 'American Pale Ale com lupulo americano tropical',
-        imageUrl: 'https://images.unsplash.com/photo-1566633806327-68e152aaf26d?w=400',
-        price: 27.9,
-        calories: 175,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 5,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catCervejasArtesanais.id,
-        name: 'Belgian Tripel Dogma (330ml)',
-        description: 'Cerveja belga forte com notas frutadas e condimentadas',
-        imageUrl: 'https://images.unsplash.com/photo-1579619797758-c2b1b5f8a2a9?w=400',
-        price: 32.9,
-        calories: 240,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 6,
-      },
-
-      // CERVEJAS COMERCIAIS (5 items)
-      {
-        restaurantId: restaurant.id,
-        categoryId: catCervejasComerciais.id,
-        name: 'Heineken Long Neck',
-        description: 'Cerveja premium holandesa (330ml)',
-        imageUrl: 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=400',
-        price: 12.9,
-        calories: 140,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 1,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catCervejasComerciais.id,
-        name: 'Brahma Litrinho',
-        description: 'Cerveja Brahma em garrafa retornavel (300ml)',
-        imageUrl: 'https://images.unsplash.com/photo-1535958636474-b021ee887b13?w=400',
-        price: 8.9,
-        calories: 130,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 2,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catCervejasComerciais.id,
-        name: 'Original 600ml',
-        description: 'Cerveja Original garrafa grande',
-        imageUrl: 'https://images.unsplash.com/photo-1571068761877-d3e9117a60df?w=400',
-        price: 16.9,
-        calories: 240,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 3,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catCervejasComerciais.id,
-        name: 'Stella Artois Long Neck',
-        description: 'Cerveja belga premium (330ml)',
-        imageUrl: 'https://images.unsplash.com/photo-1613735536968-7c53a65f8a77?w=400',
-        price: 13.9,
-        calories: 140,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 4,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catCervejasComerciais.id,
-        name: 'Corona Extra Long Neck',
-        description: 'Cerveja mexicana leve (330ml)',
-        imageUrl: 'https://images.unsplash.com/photo-1581014042837-5d89c5c0ca37?w=400',
-        price: 14.9,
-        calories: 135,
-        allergens: ['gluten'],
-        isAvailable: true,
-        displayOrder: 5,
-      },
-
-      // DRINKS E COQUETEIS (8 items)
-      {
-        restaurantId: restaurant.id,
-        categoryId: catDrinks.id,
-        name: 'Caipirinha Tradicional',
-        description: 'Cachaca, limao, acucar e gelo - o classico brasileiro',
-        imageUrl: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400',
-        price: 22.9,
-        calories: 180,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 1,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catDrinks.id,
-        name: 'Caipiroska de Frutas',
-        description: 'Vodka com frutas da estacao, limao e acucar',
-        imageUrl: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400',
-        price: 26.9,
-        calories: 195,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 2,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catDrinks.id,
-        name: 'Mojito',
-        description: 'Rum, hortela, limao, acucar e agua com gas',
-        imageUrl: 'https://images.unsplash.com/photo-1551538827-9c037cb4f32a?w=400',
-        price: 28.9,
-        calories: 170,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 3,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catDrinks.id,
-        name: 'Moscow Mule',
-        description: 'Vodka, cerveja de gengibre e limao servido em caneca de cobre',
-        imageUrl: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=400',
-        price: 32.9,
-        calories: 160,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 4,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catDrinks.id,
-        name: 'Aperol Spritz',
-        description: 'Aperol, prosecco e agua com gas',
-        imageUrl: 'https://images.unsplash.com/photo-1560512823-829485b8bf24?w=400',
-        price: 34.9,
-        calories: 140,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 5,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catDrinks.id,
-        name: 'Gin Tonica',
-        description: 'Gin premium, agua tonica, especiarias e citricos',
-        imageUrl: 'https://images.unsplash.com/photo-1551751299-1b51cab2694c?w=400',
-        price: 36.9,
-        calories: 120,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 6,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catDrinks.id,
-        name: 'Whisky do Chef',
-        description: 'Dose de whisky 12 anos com gelo (50ml)',
-        imageUrl: 'https://images.unsplash.com/photo-1527281400683-1aae777175f8?w=400',
-        price: 38.9,
-        calories: 110,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 7,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catDrinks.id,
-        name: 'Sangria da Casa (jarra)',
-        description: 'Vinho tinto com frutas frescas, especiarias e licor',
-        imageUrl: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400',
-        price: 58.9,
-        calories: 280,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 8,
-      },
-
-      // BEBIDAS NAO ALCOOLICAS (6 items)
-      {
-        restaurantId: restaurant.id,
-        categoryId: catBebidasNaoAlcoolicas.id,
-        name: 'Refrigerante Lata',
-        description: 'Coca-Cola, Guarana Antarctica, Sprite ou Fanta (350ml)',
-        imageUrl: 'https://images.unsplash.com/photo-1581006852262-e4307cf6283a?w=400',
-        price: 7.9,
-        calories: 140,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 1,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catBebidasNaoAlcoolicas.id,
-        name: 'Suco Natural (500ml)',
-        description: 'Laranja, limao, abacaxi, maracuja ou morango',
-        imageUrl: 'https://images.unsplash.com/photo-1534353473418-4cfa6c56fd38?w=400',
-        price: 14.9,
-        calories: 120,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 2,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catBebidasNaoAlcoolicas.id,
-        name: 'Agua Mineral (500ml)',
-        description: 'Com ou sem gas',
-        imageUrl: 'https://images.unsplash.com/photo-1559839914-17aae19cec71?w=400',
-        price: 5.9,
-        calories: 0,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 3,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catBebidasNaoAlcoolicas.id,
-        name: 'Agua de Coco (500ml)',
-        description: 'Agua de coco natural gelada',
-        imageUrl: 'https://images.unsplash.com/photo-1525385133512-2f3bdd039054?w=400',
-        price: 9.9,
-        calories: 45,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 4,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catBebidasNaoAlcoolicas.id,
-        name: 'Cha Gelado (500ml)',
-        description: 'Cha preto com limao ou cha verde com limao',
-        imageUrl: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400',
-        price: 11.9,
-        calories: 80,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 5,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catBebidasNaoAlcoolicas.id,
-        name: 'Cafe Espresso',
-        description: 'Cafe espresso curto ou longo',
-        imageUrl: 'https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?w=400',
-        price: 6.9,
-        calories: 5,
-        allergens: [],
-        isAvailable: true,
-        displayOrder: 6,
-      },
-
-      // SOBREMESAS (5 items)
-      {
-        restaurantId: restaurant.id,
-        categoryId: catSobremesas.id,
-        name: 'Petit Gateau',
-        description: 'Bolinho de chocolate com centro derretido e sorvete de creme',
-        imageUrl: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=400',
-        price: 28.9,
-        calories: 480,
-        allergens: ['gluten', 'lactose', 'ovos'],
-        isAvailable: true,
-        displayOrder: 1,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catSobremesas.id,
-        name: 'Pudim de Leite',
-        description: 'Pudim caseiro de leite condensado com calda de caramelo',
-        imageUrl: 'https://images.unsplash.com/photo-1517427294546-5aa121f68e8a?w=400',
-        price: 18.9,
-        calories: 320,
-        allergens: ['lactose', 'ovos'],
-        isAvailable: true,
-        displayOrder: 2,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catSobremesas.id,
-        name: 'Churros com Doce de Leite (4 un)',
-        description: 'Churros crocantes recheados com doce de leite, com canela e acucar',
-        imageUrl: 'https://images.unsplash.com/photo-1624371414361-e670e6dcc3e0?w=400',
-        price: 22.9,
-        calories: 380,
-        allergens: ['gluten', 'lactose'],
-        isAvailable: true,
-        displayOrder: 3,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catSobremesas.id,
-        name: 'Cartola',
-        description: 'Banana assada com queijo coalho, canela e acucar',
-        imageUrl: 'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=400',
-        price: 24.9,
-        calories: 350,
-        allergens: ['lactose'],
-        isAvailable: true,
-        displayOrder: 4,
-      },
-      {
-        restaurantId: restaurant.id,
-        categoryId: catSobremesas.id,
-        name: 'Acai na Tigela (300ml)',
-        description: 'Acai com granola, banana, morango e leite condensado',
-        imageUrl: 'https://images.unsplash.com/photo-1590301157890-4810ed352733?w=400',
-        price: 26.9,
-        calories: 420,
-        allergens: ['gluten', 'lactose'],
-        isAvailable: true,
-        displayOrder: 5,
-      },
-    ],
-  });
-
-  console.log(`   ${menuItems.length} itens de cardapio criados!`);
-
-  // Create a map for easy access to menu items by name
-  const menuItemMap: Record<string, typeof menuItems[0]> = {};
-  for (const item of menuItems) {
-    menuItemMap[item.name] = item;
+    menuItemsCreated.push({ id: menuItem.id, name: menuItem.name, price: Number(menuItem.price), categoryName: item.category });
   }
+  console.log(`✅ ${MENU_CATEGORIES.length} categorias e ${menuItemsCreated.length} itens criados!\n`);
 
-  // ============================================
-  // SUPPLIERS - 4 Fornecedores
-  // ============================================
-  console.log('[10/15] Criando fornecedores e estoque...');
+  // ========================================
+  // 7. CRIAR FORNECEDORES
+  // ========================================
+  console.log('🏭 Criando fornecedores...');
+  const suppliersCreated = await Promise.all(
+    SUPPLIERS.map((supplier) =>
+      prisma.supplier.create({ data: { restaurantId: restaurant.id, name: supplier.name, cnpj: supplier.cnpj, email: supplier.email, phone: supplier.phone, address: supplier.address, isActive: true } })
+    )
+  );
+  console.log(`✅ ${suppliersCreated.length} fornecedores criados!\n`);
 
-  const supplierFrigorifico = await prisma.supplier.create({
-    data: {
-      restaurantId: restaurant.id,
-      name: 'Frigorifico Boi Gordo Ltda',
-      cnpj: '12.345.678/0001-90',
-      email: 'vendas@boigordo.com.br',
-      phone: '+55 11 4567-8901',
-      address: 'Rodovia Anhanguera, km 52 - Jundiai, SP - CEP 13209-000',
-      notes: 'Fornecedor de carnes bovinas e suinas. Entrega as teras e quintas.',
-      isActive: true,
-    },
-  });
+  // ========================================
+  // 8. CRIAR INVENTÁRIO
+  // ========================================
+  console.log('📦 Criando inventário detalhado...');
+  const inventoryCreated: Array<{ id: string; name: string; unit: string }> = [];
 
-  const supplierBebidas = await prisma.supplier.create({
-    data: {
-      restaurantId: restaurant.id,
-      name: 'Distribuidora de Bebidas Paulista',
-      cnpj: '23.456.789/0001-01',
-      email: 'pedidos@bebidaspaulista.com.br',
-      phone: '+55 11 3456-7890',
-      address: 'Av. das Nacoes Unidas, 15000 - Chacara Santo Antonio, Sao Paulo - SP',
-      notes: 'Distribuidora de cervejas, destilados e refrigerantes. Entrega diaria.',
-      isActive: true,
-    },
-  });
+  for (const item of INVENTORY_ITEMS) {
+    const lastPrice = randomDecimal(5, 100);
+    const avgPrice = randomDecimal(5, 100);
+    const currentStock = randomDecimal(item.minStock * 1.5, item.minStock * 4, 3);
 
-  const supplierHortifruti = await prisma.supplier.create({
-    data: {
-      restaurantId: restaurant.id,
-      name: 'Hortifruti Ceagesp',
-      cnpj: '34.567.890/0001-12',
-      email: 'contato@ceagesp.com.br',
-      phone: '+55 11 2345-6789',
-      address: 'CEAGESP - Av. Dr. Gastao Vidigal, 1946 - Vila Leopoldina, Sao Paulo - SP',
-      notes: 'Fornecedor de frutas, legumes e verduras frescos. Compra direta.',
-      isActive: true,
-    },
-  });
+    const invItem = await prisma.inventoryItem.create({
+      data: { restaurantId: restaurant.id, name: item.name, sku: item.sku, unit: item.unit, currentStock, minimumStock: item.minStock, lastPurchasePrice: lastPrice, averagePrice: avgPrice, trackStock: true, isActive: true },
+    });
+    inventoryCreated.push({ id: invItem.id, name: invItem.name, unit: invItem.unit });
+  }
+  console.log(`✅ ${inventoryCreated.length} itens de estoque criados!\n`);
 
-  const supplierSecos = await prisma.supplier.create({
-    data: {
-      restaurantId: restaurant.id,
-      name: 'Atacadao Secos e Molhados',
-      cnpj: '45.678.901/0001-23',
-      email: 'atacado@secosemolhados.com.br',
-      phone: '+55 11 5678-9012',
-      address: 'Rua Augusta, 2500 - Consolacao, Sao Paulo - SP',
-      notes: 'Fornecedor de produtos secos, enlatados e embalagens.',
-      isActive: true,
-    },
-  });
+  // ========================================
+  // 9. CRIAR CLIENTES
+  // ========================================
+  console.log('👤 Criando clientes...');
+  const customerPassword = await bcrypt.hash('Cliente123!', 12);
+  const customers: Array<{ id: string; email: string; fullName: string }> = [];
 
-  console.log('   4 fornecedores criados!');
+  for (let i = 0; i < 150; i++) {
+    const name = generateBrazilianName();
+    const email = generateEmail(name.firstName, name.lastName);
 
-  // ============================================
-  // INVENTORY ITEMS - 25+ items
-  // ============================================
+    const customer = await prisma.user.create({
+      data: { email, passwordHash: customerPassword, fullName: name.fullName, phone: generatePhone(), role: 'CUSTOMER', emailVerified: Math.random() > 0.3, createdAt: new Date(Date.now() - randomBetween(0, 180) * 24 * 60 * 60 * 1000) },
+    });
+    customers.push({ id: customer.id, email: customer.email, fullName: customer.fullName });
+  }
+  console.log(`✅ ${customers.length} clientes criados!\n`);
 
-  const inventoryItems = await prisma.inventoryItem.createManyAndReturn({
-    data: [
-      // Carnes
-      {
-        restaurantId: restaurant.id,
-        name: 'Picanha Bovina',
-        description: 'Picanha bovina de primeira',
-        sku: 'CARNE-001',
-        unit: 'KG',
-        currentStock: 25.5,
-        minimumStock: 10,
-        lastPurchasePrice: 89.9,
-        averagePrice: 85.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'File Mignon',
-        description: 'File mignon bovino',
-        sku: 'CARNE-002',
-        unit: 'KG',
-        currentStock: 15.0,
-        minimumStock: 8,
-        lastPurchasePrice: 98.9,
-        averagePrice: 95.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Costela Bovina',
-        description: 'Costela bovina para assado',
-        sku: 'CARNE-003',
-        unit: 'KG',
-        currentStock: 30.0,
-        minimumStock: 15,
-        lastPurchasePrice: 42.9,
-        averagePrice: 40.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Linguica Calabresa',
-        description: 'Linguica calabresa defumada',
-        sku: 'CARNE-004',
-        unit: 'KG',
-        currentStock: 18.0,
-        minimumStock: 8,
-        lastPurchasePrice: 32.9,
-        averagePrice: 30.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Frango Inteiro',
-        description: 'Frango inteiro resfriado',
-        sku: 'CARNE-005',
-        unit: 'KG',
-        currentStock: 40.0,
-        minimumStock: 20,
-        lastPurchasePrice: 18.9,
-        averagePrice: 17.5,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Bacon Defumado',
-        description: 'Bacon em fatias',
-        sku: 'CARNE-006',
-        unit: 'KG',
-        currentStock: 8.5,
-        minimumStock: 5,
-        lastPurchasePrice: 52.9,
-        averagePrice: 50.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Torresmo',
-        description: 'Torresmo de rolo',
-        sku: 'CARNE-007',
-        unit: 'KG',
-        currentStock: 12.0,
-        minimumStock: 6,
-        lastPurchasePrice: 38.9,
-        averagePrice: 36.0,
-        trackStock: true,
-        isActive: true,
-      },
-      // Peixes e Frutos do Mar
-      {
-        restaurantId: restaurant.id,
-        name: 'Tilapia em Files',
-        description: 'File de tilapia congelado',
-        sku: 'PEIXE-001',
-        unit: 'KG',
-        currentStock: 10.0,
-        minimumStock: 5,
-        lastPurchasePrice: 45.9,
-        averagePrice: 43.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Bacalhau Dessalgado',
-        description: 'Lascas de bacalhau dessalgado',
-        sku: 'PEIXE-002',
-        unit: 'KG',
-        currentStock: 6.0,
-        minimumStock: 3,
-        lastPurchasePrice: 120.0,
-        averagePrice: 115.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Camarao G',
-        description: 'Camarao grande limpo',
-        sku: 'PEIXE-003',
-        unit: 'KG',
-        currentStock: 5.0,
-        minimumStock: 3,
-        lastPurchasePrice: 98.0,
-        averagePrice: 95.0,
-        trackStock: true,
-        isActive: true,
-      },
-      // Vegetais e Legumes
-      {
-        restaurantId: restaurant.id,
-        name: 'Batata Inglesa',
-        description: 'Batata para fritura',
-        sku: 'VEG-001',
-        unit: 'KG',
-        currentStock: 100.0,
-        minimumStock: 50,
-        lastPurchasePrice: 6.9,
-        averagePrice: 6.5,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Mandioca',
-        description: 'Mandioca fresca',
-        sku: 'VEG-002',
-        unit: 'KG',
-        currentStock: 40.0,
-        minimumStock: 20,
-        lastPurchasePrice: 8.9,
-        averagePrice: 8.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Cebola',
-        description: 'Cebola branca',
-        sku: 'VEG-003',
-        unit: 'KG',
-        currentStock: 30.0,
-        minimumStock: 15,
-        lastPurchasePrice: 5.9,
-        averagePrice: 5.5,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Tomate',
-        description: 'Tomate italiano',
-        sku: 'VEG-004',
-        unit: 'KG',
-        currentStock: 20.0,
-        minimumStock: 10,
-        lastPurchasePrice: 8.9,
-        averagePrice: 8.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Limao Tahiti',
-        description: 'Limao tahiti fresco',
-        sku: 'VEG-005',
-        unit: 'KG',
-        currentStock: 15.0,
-        minimumStock: 8,
-        lastPurchasePrice: 7.9,
-        averagePrice: 7.0,
-        trackStock: true,
-        isActive: true,
-      },
-      // Laticinios
-      {
-        restaurantId: restaurant.id,
-        name: 'Queijo Mussarela',
-        description: 'Mussarela fatiada',
-        sku: 'LAT-001',
-        unit: 'KG',
-        currentStock: 12.0,
-        minimumStock: 6,
-        lastPurchasePrice: 42.9,
-        averagePrice: 40.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Queijo Cheddar',
-        description: 'Cheddar em fatias',
-        sku: 'LAT-002',
-        unit: 'KG',
-        currentStock: 8.0,
-        minimumStock: 4,
-        lastPurchasePrice: 55.9,
-        averagePrice: 52.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Queijo Provolone',
-        description: 'Provolone inteiro',
-        sku: 'LAT-003',
-        unit: 'KG',
-        currentStock: 5.0,
-        minimumStock: 3,
-        lastPurchasePrice: 68.9,
-        averagePrice: 65.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Cream Cheese',
-        description: 'Cream cheese Philadelphia',
-        sku: 'LAT-004',
-        unit: 'KG',
-        currentStock: 4.0,
-        minimumStock: 2,
-        lastPurchasePrice: 58.9,
-        averagePrice: 55.0,
-        trackStock: true,
-        isActive: true,
-      },
-      // Bebidas
-      {
-        restaurantId: restaurant.id,
-        name: 'Cerveja Heineken LN (caixa)',
-        description: 'Caixa com 24 long necks',
-        sku: 'BEB-001',
-        unit: 'CX',
-        currentStock: 15.0,
-        minimumStock: 5,
-        lastPurchasePrice: 180.0,
-        averagePrice: 175.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Cerveja Brahma 300ml (caixa)',
-        description: 'Caixa com 24 garrafas',
-        sku: 'BEB-002',
-        unit: 'CX',
-        currentStock: 20.0,
-        minimumStock: 8,
-        lastPurchasePrice: 98.0,
-        averagePrice: 95.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Coca-Cola Lata (caixa)',
-        description: 'Caixa com 24 latas',
-        sku: 'BEB-003',
-        unit: 'CX',
-        currentStock: 10.0,
-        minimumStock: 4,
-        lastPurchasePrice: 75.0,
-        averagePrice: 72.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Cachaca 51',
-        description: 'Cachaca 51 garrafa 1L',
-        sku: 'BEB-004',
-        unit: 'UN',
-        currentStock: 12.0,
-        minimumStock: 4,
-        lastPurchasePrice: 18.9,
-        averagePrice: 17.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Vodka Absolut',
-        description: 'Vodka Absolut garrafa 1L',
-        sku: 'BEB-005',
-        unit: 'UN',
-        currentStock: 8.0,
-        minimumStock: 3,
-        lastPurchasePrice: 85.0,
-        averagePrice: 82.0,
-        trackStock: true,
-        isActive: true,
-      },
-      {
-        restaurantId: restaurant.id,
-        name: 'Gin Tanqueray',
-        description: 'Gin Tanqueray garrafa 750ml',
-        sku: 'BEB-006',
-        unit: 'UN',
-        currentStock: 6.0,
-        minimumStock: 2,
-        lastPurchasePrice: 120.0,
-        averagePrice: 115.0,
-        trackStock: true,
-        isActive: true,
-      },
-    ],
-  });
+  // ========================================
+  // 10. GERAR HISTÓRICO DE VENDAS (6 MESES)
+  // ========================================
+  console.log('📊 Gerando histórico de vendas de 6 meses...');
 
-  console.log(`   ${inventoryItems.length} itens de estoque criados!`);
+  const allFoodItems = menuItemsCreated.filter((item) => !['Cafés'].includes(item.categoryName));
 
-  // Create Stock Entry
-  const stockEntry = await prisma.stockEntry.create({
-    data: {
-      restaurantId: restaurant.id,
-      supplierId: supplierFrigorifico.id,
-      type: StockEntryType.PURCHASE,
-      referenceNumber: 'NF-2024-0892',
-      notes: 'Compra semanal de carnes - semana 01/2025',
-      totalAmount: 3250.0,
-      createdAt: daysAgo(3),
-      createdBy: owner.id,
-    },
-  });
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - 6);
+  startDate.setDate(1);
+  startDate.setHours(0, 0, 0, 0);
 
-  await prisma.stockEntryItem.createMany({
-    data: [
-      {
-        stockEntryId: stockEntry.id,
-        inventoryItemId: inventoryItems.find((i) => i.sku === 'CARNE-001')!.id,
-        quantity: 20.0,
-        unitPrice: 89.9,
-        totalPrice: 1798.0,
-      },
-      {
-        stockEntryId: stockEntry.id,
-        inventoryItemId: inventoryItems.find((i) => i.sku === 'CARNE-003')!.id,
-        quantity: 25.0,
-        unitPrice: 42.9,
-        totalPrice: 1072.5,
-      },
-      {
-        stockEntryId: stockEntry.id,
-        inventoryItemId: inventoryItems.find((i) => i.sku === 'CARNE-004')!.id,
-        quantity: 10.0,
-        unitPrice: 32.9,
-        totalPrice: 329.0,
-      },
-    ],
-  });
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
 
-  // ============================================
-  // TABLE SESSIONS AND ORDERS - Last 7 days
-  // ============================================
-  console.log('[11/15] Criando pedidos dos ultimos 7 dias...');
+  let totalOrdersCreated = 0;
+  let totalRevenue = 0;
+  let currentDate = new Date(startDate);
 
-  let orderCounter = 1;
-  const orders: Array<{ id: string; orderNumber: string; status: OrderStatus }> = [];
+  // Track today's orders for special handling
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  let todayOrderIndex = 0;
 
-  // Helper function to create orders
-  async function createOrder(
-    tableNum: number,
-    daysBack: number,
-    hoursStart: number,
-    status: OrderStatus,
-    items: Array<{ name: string; quantity: number; userId?: string }>,
-    options?: {
-      isSplit?: boolean;
-      splitMethod?: SplitMethod;
-      splitParticipants?: Array<{ userId: string; amountDue: number; paid: boolean }>;
-      paymentMethod?: PaymentMethod;
-      notes?: string;
+  while (currentDate <= today) {
+    const holiday = isHoliday(currentDate);
+    const demandFactor = getDemandFactor(currentDate, holiday);
+    const baseOrders = randomBetween(15, 25);
+    const ordersToday = Math.round(baseOrders * demandFactor);
+
+    // Check if this is today
+    const isToday = currentDate >= todayStart;
+
+    for (let i = 0; i < ordersToday; i++) {
+      const customer = randomFromArray(customers);
+      const table = randomFromArray(tables);
+
+      const hour = randomBetween(12, 23);
+      const minute = randomBetween(0, 59);
+      const orderTime = new Date(currentDate);
+      orderTime.setHours(hour, minute, randomBetween(0, 59));
+
+      const numItems = randomBetween(2, 6);
+      const selectedItems = shuffleArray(allFoodItems).slice(0, numItems);
+
+      let subtotal = 0;
+      const orderItemsData: Array<{ menuItemId: string; userId: string; quantity: number; unitPrice: number }> = [];
+
+      for (const item of selectedItems) {
+        const quantity = randomBetween(1, 3);
+        subtotal += item.price * quantity;
+        orderItemsData.push({ menuItemId: item.id, userId: customer.id, quantity, unitPrice: item.price });
+      }
+
+      const taxAmount = subtotal * 0.1;
+      const totalAmount = subtotal + taxAmount;
+
+      // For today: first order is PENDING, rest are DELIVERED
+      // For historical: all DELIVERED
+      let status: OrderStatus;
+      if (isToday) {
+        if (todayOrderIndex === 0) {
+          status = 'PENDING';
+        } else {
+          status = 'DELIVERED';
+        }
+        todayOrderIndex++;
+      } else {
+        status = 'DELIVERED';
+      }
+
+      const order = await prisma.order.create({
+        data: {
+          restaurantId: restaurant.id, orderNumber: generateOrderNumber(), tableNumber: String(table.number), status, subtotal, taxAmount, totalAmount, createdAt: orderTime,
+          confirmedAt: status !== 'PENDING' ? new Date(orderTime.getTime() + 2 * 60 * 1000) : null,
+          preparingAt: ['PREPARING', 'READY', 'DELIVERED'].includes(status) ? new Date(orderTime.getTime() + 5 * 60 * 1000) : null,
+          readyAt: ['READY', 'DELIVERED'].includes(status) ? new Date(orderTime.getTime() + 20 * 60 * 1000) : null,
+          completedAt: status === 'DELIVERED' ? new Date(orderTime.getTime() + 25 * 60 * 1000) : null,
+        },
+      });
+
+      for (const item of orderItemsData) {
+        await prisma.orderItem.create({ data: { orderId: order.id, menuItemId: item.menuItemId, userId: item.userId, quantity: item.quantity, unitPrice: item.unitPrice } });
+      }
+
+      if (status === 'DELIVERED') {
+        const paymentMethod = randomFromArray(['PIX', 'CREDIT_CARD', 'DEBIT_CARD', 'CASH']) as PaymentMethod;
+        await prisma.payment.create({
+          data: { orderId: order.id, method: paymentMethod, amount: totalAmount, status: 'COMPLETED', createdAt: orderTime, processedAt: new Date(orderTime.getTime() + 1 * 60 * 1000), completedAt: new Date(orderTime.getTime() + 2 * 60 * 1000) },
+        });
+      }
+
+      totalOrdersCreated++;
+      totalRevenue += Number(totalAmount);
     }
-  ) {
-    const table = tables.find((t) => t.number === tableNum);
-    if (!table) return null;
 
-    const orderDate = daysAgo(daysBack, hoursStart);
-    const orderNumber = generateOrderNumber('BC', orderCounter++);
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  console.log(`✅ ${totalOrdersCreated} pedidos criados!`);
+  console.log(`💰 Faturamento total: R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`);
+
+  // ========================================
+  // 11. CRIAR SESSÕES ATIVAS (HOJE)
+  // ========================================
+  console.log('🎯 Criando sessões ativas de hoje...');
+
+  const activeTables = shuffleArray(tables).slice(0, 5);
+
+  for (const table of activeTables) {
+    const sessionCustomers = shuffleArray(customers).slice(0, randomBetween(2, 4));
+
+    const session = await prisma.tableSession.create({
+      data: { tableId: table.id, restaurantId: restaurant.id, status: 'ACTIVE', startedAt: new Date(Date.now() - randomBetween(30, 120) * 60 * 1000) },
+    });
+
+    for (let i = 0; i < sessionCustomers.length; i++) {
+      await prisma.tableSessionMember.create({
+        data: { sessionId: session.id, userId: sessionCustomers[i].id, role: i === 0 ? 'OWNER' : 'MEMBER', status: 'APPROVED', paymentStatus: 'PENDING' },
+      });
+    }
+
+    const numItems = randomBetween(3, 8);
+    const selectedItems = shuffleArray(allFoodItems).slice(0, numItems);
 
     let subtotal = 0;
-    const orderItems: Array<{
-      menuItemId: string;
-      userId: string | null;
-      quantity: number;
-      unitPrice: number;
-    }> = [];
+    const orderItemsData: Array<{ menuItemId: string; userId: string; quantity: number; unitPrice: number }> = [];
 
-    for (const item of items) {
-      const menuItem = menuItemMap[item.name];
-      if (menuItem) {
-        orderItems.push({
-          menuItemId: menuItem.id,
-          userId: item.userId || null,
-          quantity: item.quantity,
-          unitPrice: Number(menuItem.price),
-        });
-        subtotal += Number(menuItem.price) * item.quantity;
-      }
+    for (const item of selectedItems) {
+      const quantity = randomBetween(1, 2);
+      const orderedBy = randomFromArray(sessionCustomers);
+      subtotal += item.price * quantity;
+      orderItemsData.push({ menuItemId: item.id, userId: orderedBy.id, quantity, unitPrice: item.price });
     }
 
-    // Create table session
-    const session = await prisma.tableSession.create({
-      data: {
-        tableId: table.id,
-        restaurantId: restaurant.id,
-        status: status === OrderStatus.DELIVERED ? SessionStatus.CLOSED : SessionStatus.ACTIVE,
-        startedAt: orderDate,
-        closedAt: status === OrderStatus.DELIVERED ? new Date(orderDate.getTime() + 2 * 60 * 60 * 1000) : null,
-        subtotal: subtotal,
-        taxAmount: 0,
-        totalAmount: subtotal,
-      },
-    });
+    const taxAmount = subtotal * 0.1;
+    const totalAmount = subtotal + taxAmount;
 
-    // Create order
     const order = await prisma.order.create({
       data: {
-        restaurantId: restaurant.id,
-        tableSessionId: session.id,
-        orderNumber: orderNumber,
-        tableNumber: String(tableNum),
-        status: status,
-        subtotal: subtotal,
-        taxAmount: 0,
-        discountAmount: 0,
-        totalAmount: subtotal,
-        isSplit: options?.isSplit || false,
-        splitCount: options?.splitParticipants?.length || 1,
-        notes: options?.notes || null,
-        createdAt: orderDate,
-        confirmedAt: status !== OrderStatus.PENDING ? new Date(orderDate.getTime() + 5 * 60 * 1000) : null,
-        preparingAt:
-          status === OrderStatus.PREPARING ||
-          status === OrderStatus.READY ||
-          status === OrderStatus.DELIVERED
-            ? new Date(orderDate.getTime() + 10 * 60 * 1000)
-            : null,
-        readyAt:
-          status === OrderStatus.READY || status === OrderStatus.DELIVERED
-            ? new Date(orderDate.getTime() + 25 * 60 * 1000)
-            : null,
-        completedAt:
-          status === OrderStatus.DELIVERED
-            ? new Date(orderDate.getTime() + 30 * 60 * 1000)
-            : null,
-        cancelledAt: status === OrderStatus.CANCELLED ? new Date(orderDate.getTime() + 15 * 60 * 1000) : null,
+        restaurantId: restaurant.id, tableSessionId: session.id, orderNumber: generateOrderNumber(), tableNumber: String(table.number),
+        status: randomFromArray(['CONFIRMED', 'PREPARING', 'READY']), subtotal, taxAmount, totalAmount,
+        isSplit: sessionCustomers.length > 1, splitCount: sessionCustomers.length, createdAt: new Date(Date.now() - randomBetween(15, 60) * 60 * 1000),
       },
     });
 
-    // Create order items
-    for (const item of orderItems) {
-      await prisma.orderItem.create({
-        data: {
-          orderId: order.id,
-          menuItemId: item.menuItemId,
-          userId: item.userId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-        },
-      });
+    for (const item of orderItemsData) {
+      await prisma.orderItem.create({ data: { orderId: order.id, menuItemId: item.menuItemId, userId: item.userId, quantity: item.quantity, unitPrice: item.unitPrice } });
     }
 
-    // Create payment if completed
-    if (status === OrderStatus.DELIVERED && !options?.isSplit) {
-      await prisma.payment.create({
-        data: {
-          orderId: order.id,
-          method: options?.paymentMethod || PaymentMethod.PIX,
-          gateway: 'tabsync',
-          gatewayId: 'pay_' + generateUUID().substring(0, 14),
-          amount: subtotal,
-          currency: 'BRL',
-          status: PaymentStatus.COMPLETED,
-          createdAt: orderDate,
-          processedAt: new Date(orderDate.getTime() + 32 * 60 * 1000),
-          completedAt: new Date(orderDate.getTime() + 33 * 60 * 1000),
-        },
-      });
-    }
-
-    // Create split payments if applicable
-    if (options?.isSplit && options?.splitParticipants) {
-      for (const participant of options.splitParticipants) {
-        await prisma.splitPayment.create({
-          data: {
-            orderId: order.id,
-            userId: participant.userId,
-            userEmail:
-              participant.userId === customer1.id
-                ? customer1.email
-                : participant.userId === customer2.id
-                  ? customer2.email
-                  : participant.userId === customer3.id
-                    ? customer3.email
-                    : participant.userId === customer4.id
-                      ? customer4.email
-                      : customer5.email,
-            userName:
-              participant.userId === customer1.id
-                ? customer1.fullName
-                : participant.userId === customer2.id
-                  ? customer2.fullName
-                  : participant.userId === customer3.id
-                    ? customer3.fullName
-                    : participant.userId === customer4.id
-                      ? customer4.fullName
-                      : customer5.fullName,
-            splitMethod: options.splitMethod || SplitMethod.EQUAL,
-            amountDue: participant.amountDue,
-            paymentStatus: participant.paid ? SplitPaymentStatus.PAID : SplitPaymentStatus.PENDING,
-            paymentToken: 'split_' + generateUUID().substring(0, 12),
-            paidAt: participant.paid ? new Date(orderDate.getTime() + 35 * 60 * 1000) : null,
-            expiresAt: new Date(orderDate.getTime() + 24 * 60 * 60 * 1000),
-          },
-        });
-      }
-    }
-
-    orders.push({ id: order.id, orderNumber: order.orderNumber, status: order.status });
-    return order;
+    await prisma.tableSession.update({ where: { id: session.id }, data: { subtotal, taxAmount, totalAmount } });
   }
+  console.log(`✅ ${activeTables.length} sessões ativas criadas!\n`);
 
-  // Create 30+ orders over the last 7 days
+  // ========================================
+  // 12. CRIAR REVIEWS
+  // ========================================
+  console.log('⭐ Criando avaliações...');
+  const reviewCustomers = shuffleArray(customers).slice(0, 80);
 
-  // Day 7 (7 days ago) - Saturday
-  await createOrder(5, 7, 13, OrderStatus.DELIVERED, [
-    { name: 'Calabresa Acebolada', quantity: 1 },
-    { name: 'Batata Frita Tradicional', quantity: 1 },
-    { name: 'Heineken Long Neck', quantity: 4 },
-  ], { paymentMethod: PaymentMethod.CREDIT_CARD });
+  for (const customer of reviewCustomers) {
+    const rating = randomFromArray([3, 4, 4, 4, 5, 5, 5, 5, 5]);
+    const comments = rating >= 4 ? POSITIVE_REVIEWS : NEUTRAL_REVIEWS;
 
-  await createOrder(8, 7, 19, OrderStatus.DELIVERED, [
-    { name: 'Picanha na Chapa (400g)', quantity: 2 },
-    { name: 'Caipirinha Tradicional', quantity: 4 },
-    { name: 'Refrigerante Lata', quantity: 2 },
-  ], { paymentMethod: PaymentMethod.DEBIT_CARD });
-
-  // Day 6 (6 days ago) - Sunday (feijoada day)
-  await createOrder(15, 6, 12, OrderStatus.DELIVERED, [
-    { name: 'Feijoada Completa', quantity: 4 },
-    { name: 'Original 600ml', quantity: 3 },
-    { name: 'Caipirinha Tradicional', quantity: 2 },
-    { name: 'Pudim de Leite', quantity: 2 },
-  ], {
-    paymentMethod: PaymentMethod.PIX,
-    notes: 'Almoco de familia - mesa grande'
-  });
-
-  await createOrder(3, 6, 14, OrderStatus.DELIVERED, [
-    { name: 'Frango a Passarinho', quantity: 1 },
-    { name: 'Mandioca Frita', quantity: 1 },
-    { name: 'Brahma Litrinho', quantity: 6 },
-  ], { paymentMethod: PaymentMethod.CASH });
-
-  // Day 5 (5 days ago) - Monday
-  await createOrder(7, 5, 18, OrderStatus.DELIVERED, [
-    { name: 'Tabua de Frios', quantity: 1 },
-    { name: 'Gin Tonica', quantity: 2 },
-    { name: 'Aperol Spritz', quantity: 2 },
-  ], { paymentMethod: PaymentMethod.PIX });
-
-  await createOrder(1, 5, 20, OrderStatus.DELIVERED, [
-    { name: 'Caipirinha Tradicional', quantity: 2 },
-    { name: 'Polenta Frita', quantity: 1 },
-  ], { paymentMethod: PaymentMethod.CREDIT_CARD });
-
-  // Day 4 (4 days ago) - Tuesday
-  await createOrder(9, 4, 19, OrderStatus.DELIVERED, [
-    { name: 'Provolone a Milanesa', quantity: 1 },
-    { name: 'Calabresa Acebolada', quantity: 1 },
-    { name: 'Batata com Cheddar e Bacon', quantity: 1 },
-    { name: 'IPA Colorado (500ml)', quantity: 3 },
-    { name: 'Weiss Eisenbahn (500ml)', quantity: 2 },
-  ], {
-    isSplit: true,
-    splitMethod: SplitMethod.EQUAL,
-    splitParticipants: [
-      { userId: customer1.id, amountDue: 79.8, paid: true },
-      { userId: customer2.id, amountDue: 79.8, paid: true },
-      { userId: customer3.id, amountDue: 79.7, paid: true },
-    ],
-    notes: 'Happy hour entre amigos - divisao igual'
-  });
-
-  await createOrder(6, 4, 21, OrderStatus.DELIVERED, [
-    { name: 'Isca de Peixe', quantity: 1 },
-    { name: 'Agua Mineral (500ml)', quantity: 2 },
-    { name: 'Suco Natural (500ml)', quantity: 1 },
-  ], { paymentMethod: PaymentMethod.DEBIT_CARD });
-
-  // Day 3 (3 days ago) - Wednesday
-  await createOrder(11, 3, 19, OrderStatus.DELIVERED, [
-    { name: 'File a Oswaldo Aranha', quantity: 2 },
-    { name: 'Risoto de Camarao', quantity: 1 },
-    { name: 'Whisky do Chef', quantity: 2 },
-    { name: 'Petit Gateau', quantity: 2 },
-  ], {
-    paymentMethod: PaymentMethod.CREDIT_CARD,
-    notes: 'Jantar VIP - aniversario'
-  });
-
-  await createOrder(4, 3, 18, OrderStatus.DELIVERED, [
-    { name: 'Coxinha (6 un)', quantity: 2 },
-    { name: 'Pastel de Carne (4 un)', quantity: 2 },
-    { name: 'Corona Extra Long Neck', quantity: 4 },
-  ], { paymentMethod: PaymentMethod.PIX });
-
-  await createOrder(2, 3, 22, OrderStatus.DELIVERED, [
-    { name: 'Moscow Mule', quantity: 2 },
-    { name: 'Dadinho de Tapioca', quantity: 1 },
-  ], { paymentMethod: PaymentMethod.PIX });
-
-  // Order cancelled
-  await createOrder(13, 3, 20, OrderStatus.CANCELLED, [
-    { name: 'Moqueca de Peixe', quantity: 2 },
-    { name: 'Agua de Coco (500ml)', quantity: 2 },
-  ], { notes: 'Cliente desistiu - demora na cozinha' });
-
-  // Day 2 (2 days ago) - Thursday
-  await createOrder(8, 2, 18, OrderStatus.DELIVERED, [
-    { name: 'Bolinho de Bacalhau (6 un)', quantity: 2 },
-    { name: 'Carpaccio de Carne', quantity: 1 },
-    { name: 'Stout Baden Baden (500ml)', quantity: 2 },
-    { name: 'Belgian Tripel Dogma (330ml)', quantity: 1 },
-  ], {
-    isSplit: true,
-    splitMethod: SplitMethod.BY_ITEM,
-    splitParticipants: [
-      { userId: customer2.id, amountDue: 72.8, paid: true }, // Bolinho + cerveja
-      { userId: customer4.id, amountDue: 97.7, paid: true }, // Bolinho + carpaccio + cerveja
-    ],
-    notes: 'Cada um paga o que pediu'
-  });
-
-  await createOrder(10, 2, 19, OrderStatus.DELIVERED, [
-    { name: 'Escondidinho de Carne Seca', quantity: 2 },
-    { name: 'Caipiroska de Frutas', quantity: 4 },
-    { name: 'Churros com Doce de Leite (4 un)', quantity: 2 },
-  ], { paymentMethod: PaymentMethod.PIX });
-
-  await createOrder(5, 2, 20, OrderStatus.DELIVERED, [
-    { name: 'Torresmo de Rolo', quantity: 1 },
-    { name: 'Aneis de Cebola', quantity: 1 },
-    { name: 'Stella Artois Long Neck', quantity: 6 },
-  ], { paymentMethod: PaymentMethod.CREDIT_CARD });
-
-  await createOrder(14, 2, 21, OrderStatus.DELIVERED, [
-    { name: 'Costela no Bafo', quantity: 1 },
-    { name: 'Batata Frita Tradicional', quantity: 1 },
-    { name: 'Original 600ml', quantity: 2 },
-  ], { paymentMethod: PaymentMethod.DEBIT_CARD });
-
-  // Day 1 (yesterday) - Friday
-  await createOrder(12, 1, 18, OrderStatus.DELIVERED, [
-    { name: 'Tabua de Frios', quantity: 2 },
-    { name: 'Sangria da Casa (jarra)', quantity: 2 },
-    { name: 'Bruschetta Italiana (4 un)', quantity: 2 },
-  ], {
-    isSplit: true,
-    splitMethod: SplitMethod.CUSTOM,
-    splitParticipants: [
-      { userId: customer1.id, amountDue: 100.0, paid: true },
-      { userId: customer3.id, amountDue: 85.0, paid: true },
-      { userId: customer5.id, amountDue: 85.4, paid: true },
-    ],
-    notes: 'Divisao customizada - anfitriao paga mais'
-  });
-
-  await createOrder(7, 1, 19, OrderStatus.DELIVERED, [
-    { name: 'Quibe Frito (6 un)', quantity: 2 },
-    { name: 'Empada de Frango (4 un)', quantity: 2 },
-    { name: 'Mojito', quantity: 4 },
-  ], { paymentMethod: PaymentMethod.PIX });
-
-  await createOrder(9, 1, 20, OrderStatus.DELIVERED, [
-    { name: 'Frango a Parmegiana', quantity: 2 },
-    { name: 'Refrigerante Lata', quantity: 2 },
-    { name: 'Cafe Espresso', quantity: 2 },
-  ], { paymentMethod: PaymentMethod.CREDIT_CARD });
-
-  await createOrder(6, 1, 21, OrderStatus.DELIVERED, [
-    { name: 'Picanha na Chapa (400g)', quantity: 1 },
-    { name: 'Caipirinha Tradicional', quantity: 2 },
-    { name: 'Cartola', quantity: 1 },
-  ], { paymentMethod: PaymentMethod.PIX });
-
-  await createOrder(3, 1, 22, OrderStatus.DELIVERED, [
-    { name: 'APA Bodebrown (500ml)', quantity: 4 },
-    { name: 'Polenta Frita', quantity: 1 },
-  ], { paymentMethod: PaymentMethod.CASH });
-
-  // Day 0 (today) - Saturday - Active orders
-  await createOrder(5, 0, 13, OrderStatus.DELIVERED, [
-    { name: 'Feijoada Completa', quantity: 2 },
-    { name: 'Caipirinha Tradicional', quantity: 2 },
-    { name: 'Acai na Tigela (300ml)', quantity: 2 },
-  ], { paymentMethod: PaymentMethod.PIX });
-
-  await createOrder(8, 0, 14, OrderStatus.READY, [
-    { name: 'Calabresa Acebolada', quantity: 1 },
-    { name: 'Batata com Cheddar e Bacon', quantity: 1 },
-    { name: 'Heineken Long Neck', quantity: 4 },
-  ], { notes: 'Pedido pronto para entrega' });
-
-  await createOrder(10, 0, 15, OrderStatus.PREPARING, [
-    { name: 'Moqueca de Peixe', quantity: 1 },
-    { name: 'Risoto de Camarao', quantity: 1 },
-    { name: 'Gin Tonica', quantity: 2 },
-  ], { notes: 'Em preparacao' });
-
-  await createOrder(11, 0, 15, OrderStatus.CONFIRMED, [
-    { name: 'Costela no Bafo', quantity: 2 },
-    { name: 'Mandioca Frita', quantity: 2 },
-    { name: 'Original 600ml', quantity: 2 },
-  ], { notes: 'Confirmado, aguardando preparo' });
-
-  // Active split bill order (pending payments)
-  await createOrder(15, 0, 14, OrderStatus.PREPARING, [
-    { name: 'Picanha na Chapa (400g)', quantity: 3 },
-    { name: 'Batata Frita Tradicional', quantity: 2 },
-    { name: 'Calabresa Acebolada', quantity: 1 },
-    { name: 'Caipirinha Tradicional', quantity: 4 },
-    { name: 'Brahma Litrinho', quantity: 6 },
-  ], {
-    isSplit: true,
-    splitMethod: SplitMethod.EQUAL,
-    splitParticipants: [
-      { userId: customer1.id, amountDue: 130.47, paid: true },
-      { userId: customer2.id, amountDue: 130.47, paid: false },
-      { userId: customer4.id, amountDue: 130.46, paid: false },
-    ],
-    notes: 'Almoco de sabado em grupo - 1 ja pagou, 2 pendentes'
-  });
-
-  await createOrder(4, 0, 15, OrderStatus.PENDING, [
-    { name: 'Isca de Peixe', quantity: 1 },
-    { name: 'Agua de Coco (500ml)', quantity: 2 },
-  ], { notes: 'Novo pedido aguardando confirmacao' });
-
-  await createOrder(2, 0, 16, OrderStatus.PENDING, [
-    { name: 'Aperol Spritz', quantity: 2 },
-    { name: 'Tabua de Frios', quantity: 1 },
-  ], { notes: 'Mesa do balcao' });
-
-  console.log(`   ${orders.length} pedidos criados!`);
-
-  // ============================================
-  // REVIEWS - 12 reviews
-  // ============================================
-  console.log('[12/15] Criando avaliacoes e feedback...');
-
-  const reviews = await prisma.review.createMany({
-    data: [
-      {
-        restaurantId: restaurant.id,
-        userId: customer1.id,
-        overallRating: 5,
-        foodRating: 5,
-        serviceRating: 5,
-        ambianceRating: 5,
-        waitTimeRating: 4,
-        valueRating: 5,
-        comment: 'Melhor boteco de SP! Calabresa acebolada sensacional, atendimento impecavel. Voltarei sempre!',
-        isPublic: true,
-        createdAt: daysAgo(6),
+    await prisma.review.create({
+      data: {
+        restaurantId: restaurant.id, userId: customer.id, overallRating: rating,
+        foodRating: randomBetween(Math.max(1, rating - 1), 5), serviceRating: randomBetween(Math.max(1, rating - 1), 5),
+        ambianceRating: randomBetween(Math.max(1, rating - 1), 5), waitTimeRating: randomBetween(Math.max(1, rating - 1), 5), valueRating: randomBetween(Math.max(1, rating - 1), 5),
+        comment: Math.random() > 0.3 ? randomFromArray(comments) : null, isPublic: true,
+        createdAt: new Date(Date.now() - randomBetween(1, 180) * 24 * 60 * 60 * 1000),
       },
-      {
-        restaurantId: restaurant.id,
-        userId: customer2.id,
-        overallRating: 4,
-        foodRating: 5,
-        serviceRating: 4,
-        ambianceRating: 4,
-        waitTimeRating: 3,
-        valueRating: 4,
-        comment: 'Comida excelente! So demorou um pouco no sabado a noite, mas entendo que estava cheio.',
-        response: 'Obrigado pelo feedback, Juliana! Estamos trabalhando para melhorar nossos tempos de espera nos fins de semana.',
-        respondedAt: daysAgo(5),
-        isPublic: true,
-        createdAt: daysAgo(5),
+    });
+  }
+  console.log(`✅ ${reviewCustomers.length} avaliações criadas!\n`);
+
+  // ========================================
+  // 13. CRIAR SUGESTÕES
+  // ========================================
+  console.log('💡 Criando sugestões...');
+  const suggestionCustomers = shuffleArray(customers).slice(0, 15);
+
+  for (const customer of suggestionCustomers) {
+    await prisma.suggestion.create({
+      data: {
+        restaurantId: restaurant.id, userId: customer.id,
+        category: randomFromArray(['MENU', 'SERVICE', 'AMBIANCE', 'OTHER']),
+        content: randomFromArray(SUGGESTION_CONTENTS), isAnonymous: Math.random() > 0.7,
+        status: randomFromArray(['UNREAD', 'READ', 'RESPONDED']),
+        createdAt: new Date(Date.now() - randomBetween(1, 90) * 24 * 60 * 60 * 1000),
       },
-      {
-        restaurantId: restaurant.id,
-        userId: customer3.id,
-        overallRating: 5,
-        foodRating: 5,
-        serviceRating: 5,
-        ambianceRating: 4,
-        waitTimeRating: 5,
-        valueRating: 4,
-        comment: 'Picanha na chapa perfeita! O ponto estava exatamente como pedi. Funcionarios muito atenciosos.',
-        isPublic: true,
-        createdAt: daysAgo(4),
+    });
+  }
+  console.log(`✅ ${suggestionCustomers.length} sugestões criadas!\n`);
+
+  // ========================================
+  // 14. CRIAR NPS
+  // ========================================
+  console.log('📈 Criando respostas NPS...');
+  const npsCustomers = shuffleArray(customers).slice(0, 50);
+
+  for (const customer of npsCustomers) {
+    const score = randomFromArray([6, 7, 7, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10]);
+
+    await prisma.npsResponse.create({
+      data: {
+        restaurantId: restaurant.id, userId: customer.id, score,
+        feedback: score >= 9 ? 'Excelente experiência!' : score <= 6 ? 'Pode melhorar.' : null,
+        createdAt: new Date(Date.now() - randomBetween(1, 180) * 24 * 60 * 60 * 1000),
       },
-      {
-        restaurantId: restaurant.id,
-        userId: customer4.id,
-        overallRating: 4,
-        foodRating: 4,
-        serviceRating: 5,
-        ambianceRating: 4,
-        waitTimeRating: 4,
-        valueRating: 3,
-        comment: 'Ambiente muito agradavel, cerveja sempre gelada. Achei um pouco caro, mas a qualidade compensa.',
-        response: 'Camila, agradecemos sua visita! Trabalhamos com ingredientes de primeira qualidade para garantir a melhor experiencia.',
-        respondedAt: daysAgo(3),
-        isPublic: true,
-        createdAt: daysAgo(3),
-      },
-      {
-        restaurantId: restaurant.id,
-        userId: customer5.id,
-        overallRating: 5,
-        foodRating: 5,
-        serviceRating: 5,
-        ambianceRating: 5,
-        waitTimeRating: 5,
-        valueRating: 5,
-        comment: 'Feijoada de domingo e tradicao! Nao existe melhor em Sao Paulo. Parabens a toda equipe!',
-        isPublic: true,
-        createdAt: daysAgo(2),
-      },
-      {
-        restaurantId: restaurant.id,
-        userId: customer1.id,
-        overallRating: 4,
-        foodRating: 4,
-        serviceRating: 4,
-        ambianceRating: 5,
-        waitTimeRating: 4,
-        valueRating: 4,
-        comment: 'Happy hour perfeito com os amigos. Drinks muito bem feitos e porcoes generosas.',
-        isPublic: true,
-        createdAt: daysAgo(1),
-      },
-      {
-        restaurantId: restaurant.id,
-        userId: customer2.id,
-        overallRating: 5,
-        foodRating: 5,
-        serviceRating: 5,
-        ambianceRating: 5,
-        waitTimeRating: 5,
-        valueRating: 5,
-        comment: 'Sistema de dividir conta pelo celular e fantastico! Nunca mais vou ter dor de cabeca pra fechar conta.',
-        isPublic: true,
-        createdAt: daysAgo(1),
-      },
-      {
-        restaurantId: restaurant.id,
-        userId: customer3.id,
-        overallRating: 3,
-        foodRating: 4,
-        serviceRating: 3,
-        ambianceRating: 3,
-        waitTimeRating: 2,
-        valueRating: 3,
-        comment: 'Comida boa mas demorou muito na sexta-feira. Quase 1 hora pra receber o pedido.',
-        response: 'Pedro, pedimos desculpas pela demora! Sexta-feira foi atipico por conta de um evento. Esperamos ter a oportunidade de melhorar sua experiencia.',
-        respondedAt: new Date(),
-        isPublic: true,
-        createdAt: daysAgo(1),
-      },
-      {
-        restaurantId: restaurant.id,
-        userId: customer4.id,
-        overallRating: 5,
-        foodRating: 5,
-        serviceRating: 5,
-        ambianceRating: 5,
-        waitTimeRating: 4,
-        valueRating: 5,
-        comment: 'Boteco com alma! Ambiente acolhedor, comida de verdade e funcionarios que tratam a gente como amigo.',
-        isPublic: true,
-        createdAt: hoursAgo(12),
-      },
-      {
-        restaurantId: restaurant.id,
-        userId: customer5.id,
-        overallRating: 4,
-        foodRating: 5,
-        serviceRating: 4,
-        ambianceRating: 4,
-        waitTimeRating: 4,
-        valueRating: 4,
-        comment: 'Cervejas artesanais muito bem selecionadas. Recomendo a IPA Colorado!',
-        isPublic: true,
-        createdAt: hoursAgo(6),
-      },
-    ],
-  });
+    });
+  }
+  console.log(`✅ ${npsCustomers.length} respostas NPS criadas!\n`);
 
-  console.log('   10 avaliacoes criadas!');
+  // ========================================
+  // 15. CRIAR ENTRADAS DE ESTOQUE
+  // ========================================
+  console.log('📥 Criando histórico de entradas de estoque...');
 
-  // ============================================
-  // SUGGESTIONS - 4 suggestions
-  // ============================================
+  for (let i = 0; i < 20; i++) {
+    const supplier = randomFromArray(suppliersCreated);
+    const daysAgo = randomBetween(1, 180);
+    const entryDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
 
-  await prisma.suggestion.createMany({
-    data: [
-      {
-        restaurantId: restaurant.id,
-        userId: customer1.id,
-        category: SuggestionCategory.MENU,
-        content: 'Seria otimo ter opcoes vegetarianas no cardapio! Minha esposa e vegetariana e tem poucas opcoes pra ela.',
-        isAnonymous: false,
-        status: SuggestionStatus.READ,
-        createdAt: daysAgo(5),
-      },
-      {
-        restaurantId: restaurant.id,
-        userId: customer3.id,
-        category: SuggestionCategory.SERVICE,
-        content: 'Sugestao de criar um programa de fidelidade. Frequento toda semana e seria legal ter algum beneficio.',
-        isAnonymous: false,
-        status: SuggestionStatus.RESPONDED,
-        response: 'Otima sugestao Pedro! Estamos desenvolvendo nosso programa de fidelidade que sera lancado em breve. Obrigado!',
-        respondedAt: daysAgo(4),
-        createdAt: daysAgo(4),
-      },
-      {
-        restaurantId: restaurant.id,
-        userId: null,
-        category: SuggestionCategory.AMBIANCE,
-        content: 'O som ambiente poderia ser um pouco mais baixo, as vezes fica dificil conversar.',
-        isAnonymous: true,
-        status: SuggestionStatus.UNREAD,
-        createdAt: daysAgo(2),
-      },
-      {
-        restaurantId: restaurant.id,
-        userId: customer5.id,
-        category: SuggestionCategory.MENU,
-        content: 'Adoraria ver mais opcoes de sobremesas! Quem sabe um brownie ou um cheesecake?',
-        isAnonymous: false,
-        status: SuggestionStatus.UNREAD,
-        createdAt: daysAgo(1),
-      },
-    ],
-  });
+    const numItems = randomBetween(3, 8);
+    const selectedInventory = shuffleArray(inventoryCreated).slice(0, numItems);
 
-  console.log('   4 sugestoes criadas!');
+    let totalAmount = 0;
+    const entryItems: Array<{ inventoryItemId: string; quantity: number; unitPrice: number; totalPrice: number }> = [];
 
-  // ============================================
-  // COMPLAINTS - 2 complaints
-  // ============================================
+    for (const inv of selectedInventory) {
+      const unitPrice = randomDecimal(5, 100);
+      const quantity = randomDecimal(5, 30, 3);
+      const totalPrice = unitPrice * quantity;
+      totalAmount += totalPrice;
 
-  await prisma.complaint.createMany({
-    data: [
-      {
-        restaurantId: restaurant.id,
-        userId: customer3.id,
-        category: ComplaintCategory.WAIT_TIME,
-        priority: Priority.MEDIUM,
-        status: ComplaintStatus.RESOLVED,
-        subject: 'Demora excessiva no pedido',
-        description: 'Na sexta-feira passada esperei mais de 1 hora pelo meu pedido de moqueca. O garcom nao deu nenhuma satisfacao durante a espera.',
-        escalatedToSuper: false,
-        response: 'Caro Pedro, pedimos sinceras desculpas pelo ocorrido. Tivemos um problema na cozinha naquele dia que ja foi resolvido. Gostaramos de oferecer um desconto de 30% na sua proxima visita como forma de desculpas. Entre em contato conosco para receber seu cupom.',
-        respondedAt: daysAgo(1),
-        resolvedAt: daysAgo(1),
-        createdAt: daysAgo(2),
-      },
-      {
-        restaurantId: restaurant.id,
-        userId: customer4.id,
-        category: ComplaintCategory.BILLING,
-        priority: Priority.LOW,
-        status: ComplaintStatus.IN_PROGRESS,
-        subject: 'Cobranca incorreta na conta',
-        description: 'Fui cobrado por 3 cervejas quando pedi apenas 2. Ja paguei a conta mas gostaria de estorno.',
-        escalatedToSuper: false,
-        createdAt: daysAgo(1),
-      },
-    ],
-  });
+      entryItems.push({ inventoryItemId: inv.id, quantity, unitPrice, totalPrice });
+    }
 
-  console.log('   2 reclamacoes criadas!');
+    const stockEntry = await prisma.stockEntry.create({
+      data: { restaurantId: restaurant.id, supplierId: supplier.id, type: 'PURCHASE', referenceNumber: `NF-${Date.now().toString(36).toUpperCase()}-${i}`, totalAmount, createdAt: entryDate },
+    });
 
-  // ============================================
-  // NPS RESPONSES - 8 responses
-  // ============================================
+    for (const item of entryItems) {
+      await prisma.stockEntryItem.create({
+        data: { stockEntryId: stockEntry.id, inventoryItemId: item.inventoryItemId, quantity: item.quantity, unitPrice: item.unitPrice, totalPrice: item.totalPrice },
+      });
+    }
+  }
+  console.log(`✅ 20 entradas de estoque criadas!\n`);
 
-  await prisma.npsResponse.createMany({
-    data: [
-      { restaurantId: restaurant.id, userId: customer1.id, score: 10, feedback: 'Recomendo demais!', createdAt: daysAgo(6) },
-      { restaurantId: restaurant.id, userId: customer2.id, score: 9, feedback: 'Otimo lugar, voltarei com certeza', createdAt: daysAgo(5) },
-      { restaurantId: restaurant.id, userId: customer3.id, score: 8, feedback: 'Bom, mas pode melhorar o tempo de espera', createdAt: daysAgo(4) },
-      { restaurantId: restaurant.id, userId: customer4.id, score: 10, feedback: 'Perfeito!', createdAt: daysAgo(3) },
-      { restaurantId: restaurant.id, userId: customer5.id, score: 9, createdAt: daysAgo(2) },
-      { restaurantId: restaurant.id, userId: customer1.id, score: 10, feedback: 'Melhor boteco de SP', createdAt: daysAgo(1) },
-      { restaurantId: restaurant.id, userId: customer2.id, score: 7, feedback: 'Bom mas um pouco caro', createdAt: hoursAgo(12) },
-      { restaurantId: restaurant.id, userId: customer5.id, score: 9, createdAt: hoursAgo(4) },
-    ],
-  });
+  // ========================================
+  // 16. CRIAR ANALYTICS EVENTS
+  // ========================================
+  console.log('📊 Criando eventos de analytics...');
 
-  console.log('   8 respostas NPS criadas!');
+  const eventTypes = ['page_view', 'menu_view', 'item_click', 'add_to_cart', 'checkout_start', 'payment_success', 'review_submit', 'qr_scan', 'session_start', 'session_end'];
 
-  // ============================================
-  // ANALYTICS EVENTS - 30+ events
-  // ============================================
-  console.log('[13/15] Criando eventos de analytics...');
+  for (let i = 0; i < 500; i++) {
+    const customer = randomFromArray(customers);
+    const daysAgo = randomBetween(0, 30);
 
-  const analyticsEvents = [
-    // Menu views
-    { eventType: 'menu_view', eventData: { category: 'Porcoes' }, createdAt: daysAgo(6, 18) },
-    { eventType: 'menu_view', eventData: { category: 'Cervejas Artesanais' }, createdAt: daysAgo(6, 19) },
-    { eventType: 'menu_item_view', eventData: { itemName: 'Calabresa Acebolada', itemId: menuItemMap['Calabresa Acebolada']?.id }, createdAt: daysAgo(5, 18) },
-    { eventType: 'menu_item_view', eventData: { itemName: 'Picanha na Chapa (400g)', itemId: menuItemMap['Picanha na Chapa (400g)']?.id }, createdAt: daysAgo(5, 19) },
-    { eventType: 'menu_item_view', eventData: { itemName: 'Caipirinha Tradicional', itemId: menuItemMap['Caipirinha Tradicional']?.id }, createdAt: daysAgo(4, 18) },
-
-    // Order events
-    { eventType: 'order_created', eventData: { orderNumber: 'BC-0001', total: 137.5 }, createdAt: daysAgo(7, 13) },
-    { eventType: 'order_completed', eventData: { orderNumber: 'BC-0001', duration_minutes: 45 }, createdAt: daysAgo(7, 14) },
-    { eventType: 'order_created', eventData: { orderNumber: 'BC-0005', total: 239.3 }, createdAt: daysAgo(4, 19) },
-    { eventType: 'order_completed', eventData: { orderNumber: 'BC-0005', duration_minutes: 52 }, createdAt: daysAgo(4, 20) },
-
-    // Split bill events
-    { eventType: 'split_bill_created', eventData: { orderNumber: 'BC-0007', participants: 3, method: 'EQUAL' }, createdAt: daysAgo(4, 19) },
-    { eventType: 'split_payment_completed', eventData: { orderNumber: 'BC-0007', userId: customer1.id, amount: 79.8 }, createdAt: daysAgo(4, 20) },
-    { eventType: 'split_payment_completed', eventData: { orderNumber: 'BC-0007', userId: customer2.id, amount: 79.8 }, createdAt: daysAgo(4, 20) },
-    { eventType: 'split_payment_completed', eventData: { orderNumber: 'BC-0007', userId: customer3.id, amount: 79.7 }, createdAt: daysAgo(4, 21) },
-
-    // Payment events
-    { eventType: 'payment_received', eventData: { method: 'PIX', amount: 137.5 }, createdAt: daysAgo(7, 14) },
-    { eventType: 'payment_received', eventData: { method: 'CREDIT_CARD', amount: 275.6 }, createdAt: daysAgo(6, 20) },
-    { eventType: 'payment_received', eventData: { method: 'PIX', amount: 156.8 }, createdAt: daysAgo(5, 19) },
-    { eventType: 'payment_received', eventData: { method: 'DEBIT_CARD', amount: 92.5 }, createdAt: daysAgo(4, 21) },
-    { eventType: 'payment_received', eventData: { method: 'PIX', amount: 198.2 }, createdAt: daysAgo(3, 20) },
-
-    // Table session events
-    { eventType: 'table_session_started', eventData: { tableNumber: 5, membersCount: 2 }, createdAt: daysAgo(7, 13) },
-    { eventType: 'table_session_started', eventData: { tableNumber: 15, membersCount: 4 }, createdAt: daysAgo(6, 12) },
-    { eventType: 'table_session_started', eventData: { tableNumber: 9, membersCount: 3 }, createdAt: daysAgo(4, 19) },
-    { eventType: 'table_session_closed', eventData: { tableNumber: 5, duration_minutes: 95 }, createdAt: daysAgo(7, 15) },
-    { eventType: 'table_session_closed', eventData: { tableNumber: 15, duration_minutes: 180 }, createdAt: daysAgo(6, 15) },
-
-    // Review events
-    { eventType: 'review_submitted', eventData: { rating: 5, userId: customer1.id }, createdAt: daysAgo(6, 16) },
-    { eventType: 'review_submitted', eventData: { rating: 4, userId: customer2.id }, createdAt: daysAgo(5, 22) },
-    { eventType: 'review_submitted', eventData: { rating: 5, userId: customer3.id }, createdAt: daysAgo(4, 21) },
-
-    // User activity
-    { eventType: 'user_login', eventData: { userId: customer1.id, platform: 'web' }, createdAt: daysAgo(6, 17) },
-    { eventType: 'user_login', eventData: { userId: customer2.id, platform: 'mobile' }, createdAt: daysAgo(5, 18) },
-    { eventType: 'user_login', eventData: { userId: customer3.id, platform: 'web' }, createdAt: daysAgo(4, 18) },
-    { eventType: 'qr_code_scanned', eventData: { tableNumber: 5 }, createdAt: daysAgo(7, 13) },
-    { eventType: 'qr_code_scanned', eventData: { tableNumber: 8 }, createdAt: daysAgo(7, 19) },
-    { eventType: 'qr_code_scanned', eventData: { tableNumber: 15 }, createdAt: daysAgo(6, 12) },
-  ];
-
-  for (const event of analyticsEvents) {
     await prisma.analyticsEvent.create({
       data: {
-        restaurantId: restaurant.id,
-        eventType: event.eventType,
-        eventData: event.eventData,
-        createdAt: event.createdAt,
+        restaurantId: restaurant.id, userId: customer.id, eventType: randomFromArray(eventTypes),
+        eventData: { source: randomFromArray(['web', 'mobile', 'qr']), duration: randomBetween(10, 600) },
+        createdAt: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000),
       },
     });
   }
+  console.log(`✅ 500 eventos de analytics criados!\n`);
 
-  console.log(`   ${analyticsEvents.length} eventos de analytics criados!`);
-
-  // ============================================
-  // AUDIT LOGS - 20+ entries
-  // ============================================
-  console.log('[14/15] Criando audit logs...');
-
-  interface AuditLogEntry {
-    userId: string;
-    action: string;
-    entityType?: string;
-    entityId?: string;
-    oldValue?: Prisma.InputJsonValue;
-    newValue?: Prisma.InputJsonValue;
-    ipAddress?: string;
-    createdAt: Date;
-  }
-
-  const auditLogs: AuditLogEntry[] = [
-    { userId: superAdmin.id, action: 'LOGIN', ipAddress: '189.40.123.45', createdAt: daysAgo(7, 9) },
-    { userId: owner.id, action: 'LOGIN', ipAddress: '189.40.123.46', createdAt: daysAgo(7, 10) },
-    { userId: owner.id, action: 'UPDATE_MENU_ITEM', entityType: 'MenuItem', entityId: menuItemMap['Calabresa Acebolada']?.id, createdAt: daysAgo(6, 11) },
-    { userId: waiter1.id, action: 'LOGIN', ipAddress: '189.40.123.47', createdAt: daysAgo(6, 17) },
-    { userId: waiter1.id, action: 'CREATE_ORDER', entityType: 'Order', createdAt: daysAgo(6, 18) },
-    { userId: kitchen1.id, action: 'LOGIN', ipAddress: '189.40.123.48', createdAt: daysAgo(6, 17) },
-    { userId: kitchen1.id, action: 'UPDATE_ORDER_STATUS', entityType: 'Order', newValue: { status: 'PREPARING' }, createdAt: daysAgo(6, 18) },
-    { userId: customer1.id, action: 'LOGIN', ipAddress: '187.123.45.67', createdAt: daysAgo(5, 18) },
-    { userId: customer1.id, action: 'CREATE_ORDER', entityType: 'Order', createdAt: daysAgo(5, 19) },
-    { userId: customer1.id, action: 'PROCESS_PAYMENT', entityType: 'Payment', createdAt: daysAgo(5, 20) },
-    { userId: owner.id, action: 'VIEW_ANALYTICS', createdAt: daysAgo(4, 10) },
-    { userId: owner.id, action: 'EXPORT_REPORT', entityType: 'Report', createdAt: daysAgo(4, 11) },
-    { userId: consultantUser.id, action: 'LOGIN', ipAddress: '200.150.123.89', createdAt: daysAgo(3, 14) },
-    { userId: consultantUser.id, action: 'VIEW_RESTAURANT', entityType: 'Restaurant', entityId: restaurant.id, createdAt: daysAgo(3, 14) },
-    { userId: waiter2.id, action: 'LOGIN', ipAddress: '189.40.123.49', createdAt: daysAgo(2, 17) },
-    { userId: waiter2.id, action: 'CREATE_ORDER', entityType: 'Order', createdAt: daysAgo(2, 18) },
-    { userId: customer2.id, action: 'SUBMIT_REVIEW', entityType: 'Review', createdAt: daysAgo(2, 21) },
-    { userId: owner.id, action: 'RESPOND_TO_COMPLAINT', entityType: 'Complaint', createdAt: daysAgo(1, 10) },
-    { userId: superAdmin.id, action: 'VIEW_PLATFORM_METRICS', createdAt: daysAgo(1, 9) },
-    { userId: owner.id, action: 'LOGIN', ipAddress: '189.40.123.46', createdAt: hoursAgo(5) },
-  ];
-
-  for (const log of auditLogs) {
-    await prisma.auditLog.create({
-      data: {
-        userId: log.userId,
-        action: log.action,
-        entityType: log.entityType,
-        entityId: log.entityId,
-        oldValue: log.oldValue,
-        newValue: log.newValue,
-        ipAddress: log.ipAddress,
-        createdAt: log.createdAt,
-      },
-    });
-  }
-
-  console.log(`   ${auditLogs.length} audit logs criados!`);
-
-  // ============================================
-  // SUMMARY
-  // ============================================
-  console.log('[15/15] Finalizando...');
+  // ========================================
+  // RESUMO FINAL
+  // ========================================
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('                    🎉 SEED CONCLUÍDO COM SUCESSO!              ');
+  console.log('═══════════════════════════════════════════════════════════════');
   console.log('');
-  console.log('='.repeat(60));
-  console.log('  SEED CONCLUIDO COM SUCESSO!');
-  console.log('='.repeat(60));
+  console.log('📊 RESUMO DO BOTECO DO CHEF:');
   console.log('');
-  console.log('=== CREDENCIAIS DE TESTE ===');
+  console.log(`   🏪 Restaurante: ${restaurant.name}`);
+  console.log(`   📍 Endereço: ${restaurant.addressStreet}, ${restaurant.addressCity}/${restaurant.addressState}`);
   console.log('');
-  console.log('SUPER ADMIN:');
-  console.log('  Email: admin@tabsync.com');
-  console.log('  Senha: Admin123!');
+  console.log('   👥 USUÁRIOS:');
+  console.log(`      • 1 Super Admin: admin@tabsync.com`);
+  console.log(`      • 1 Consultor: maria.consultora@tabsync.com`);
+  console.log(`      • 1 Dono: dono@botecodochef.com.br`);
+  console.log(`      • ${waiters.length} Garçons`);
+  console.log(`      • ${kitchenStaff.length} Cozinheiros`);
+  console.log(`      • ${customers.length} Clientes`);
   console.log('');
-  console.log('CONSULTANT:');
-  console.log('  Email: consultor@tabsync.com');
-  console.log('  Senha: Consultor123!');
+  console.log('   🍽️ OPERAÇÃO:');
+  console.log(`      • ${tables.length} Mesas`);
+  console.log(`      • ${MENU_CATEGORIES.length} Categorias de menu`);
+  console.log(`      • ${menuItemsCreated.length} Itens no cardápio`);
+  console.log(`      • ${inventoryCreated.length} Itens de estoque`);
+  console.log(`      • ${suppliersCreated.length} Fornecedores`);
   console.log('');
-  console.log('RESTAURANT OWNER:');
-  console.log('  Email: dono@botecodochef.com.br');
-  console.log('  Senha: Dono123!');
+  console.log('   📈 HISTÓRICO (6 MESES):');
+  console.log(`      • ${totalOrdersCreated} Pedidos`);
+  console.log(`      • R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} Faturamento`);
+  console.log(`      • ${reviewCustomers.length} Avaliações`);
+  console.log(`      • ${npsCustomers.length} Respostas NPS`);
   console.log('');
-  console.log('WAITERS:');
-  console.log('  Email: garcom1@botecodochef.com.br | PIN: 1234');
-  console.log('  Email: garcom2@botecodochef.com.br | PIN: 2345');
-  console.log('  Email: garcom3@botecodochef.com.br | PIN: 3456');
-  console.log('  Senha: Garcom123!');
+  console.log('   🔐 CREDENCIAIS DE ACESSO:');
   console.log('');
-  console.log('KITCHEN:');
-  console.log('  Email: cozinha1@botecodochef.com.br | PIN: 5678');
-  console.log('  Email: cozinha2@botecodochef.com.br | PIN: 6789');
-  console.log('  Senha: Cozinha123!');
+  console.log('      SUPER ADMIN:');
+  console.log('      Email: admin@tabsync.com');
+  console.log('      Senha: Admin123!');
   console.log('');
-  console.log('CUSTOMERS:');
-  console.log('  Email: cliente1@gmail.com');
-  console.log('  Email: cliente2@gmail.com');
-  console.log('  Email: cliente3@gmail.com');
-  console.log('  Email: cliente4@gmail.com');
-  console.log('  Email: cliente5@gmail.com');
-  console.log('  Senha: Cliente123!');
+  console.log('      DONO DO RESTAURANTE:');
+  console.log('      Email: dono@botecodochef.com.br');
+  console.log('      Senha: Dono123!');
   console.log('');
-  console.log('=== RESTAURANTE ===');
+  console.log('      GARÇOM:');
+  console.log('      Email: pedro.garcom@botecodochef.com.br');
+  console.log('      Senha: Staff123!');
   console.log('');
-  console.log('Nome: Boteco do Chef');
-  console.log('Slug: boteco-do-chef');
-  console.log('URL: /r/boteco-do-chef');
-  console.log('Mesas: 18 (com QR codes)');
-  console.log('Plano: Pro (Ativo)');
+  console.log('      COZINHA:');
+  console.log('      Email: chef.roberto@botecodochef.com.br');
+  console.log('      Senha: Staff123!');
   console.log('');
-  console.log('=== DADOS CRIADOS ===');
+  console.log('      CLIENTE (qualquer um):');
+  console.log('      Senha: Cliente123!');
   console.log('');
-  console.log(`- Usuarios: 12`);
-  console.log(`- Planos: 3 (${planBasic.name}, ${planPro.name}, ${planEnterprise.name})`);
-  console.log(`- Mesas: 18`);
-  console.log(`- Categorias de Menu: 8`);
-  console.log(`- Itens de Menu: ${menuItems.length}`);
-  console.log(`- Fornecedores: 4 (${supplierFrigorifico.name.split(' ')[0]}, ${supplierBebidas.name.split(' ')[0]}, ${supplierHortifruti.name.split(' ')[0]}, ${supplierSecos.name.split(' ')[0]})`);
-  console.log(`- Itens de Estoque: ${inventoryItems.length}`);
-  console.log(`- Pedidos: ${orders.length}`);
-  console.log(`- Avaliacoes: ${reviews.count}`);
-  console.log(`- Sugestoes: 4`);
-  console.log(`- Reclamacoes: 2`);
-  console.log(`- Respostas NPS: 8`);
-  console.log(`- Eventos Analytics: ${analyticsEvents.length}`);
-  console.log(`- Audit Logs: ${auditLogs.length}`);
-  console.log('');
-  console.log('=== DEMO SPLIT BILL ===');
-  console.log('');
-  console.log('Pedido BC-0027 tem pagamentos divididos pendentes!');
-  console.log('- 1 participante ja pagou');
-  console.log('- 2 participantes com pagamento pendente');
-  console.log('');
-  console.log('='.repeat(60));
+  console.log('═══════════════════════════════════════════════════════════════');
 }
 
 main()
   .catch((e) => {
-    console.error('Erro ao executar seed:', e);
+    console.error('❌ Erro no seed:', e);
     process.exit(1);
   })
   .finally(async () => {

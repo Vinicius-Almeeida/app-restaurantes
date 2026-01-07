@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/client';
 import { ProtectedRoute } from '@/components/auth';
@@ -10,15 +10,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'DELIVERED' | 'CANCELLED';
+type PeriodFilter = '7' | '15' | '30' | 'custom';
 
 interface Order {
   id: string;
-  tableNumber: number;
+  tableNumber: number | string;
   status: OrderStatus;
-  totalAmount: number;
+  totalAmount: number | string;
   createdAt: string;
   customer?: {
     fullName?: string;
@@ -28,17 +31,15 @@ interface Order {
 function OrdersManagementContent() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('all');
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('7');
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
 
   useEffect(() => {
     fetchOrders();
   }, []);
-
-  useEffect(() => {
-    filterOrders();
-  }, [activeTab, orders]);
 
   const fetchOrders = async () => {
     try {
@@ -52,13 +53,37 @@ function OrdersManagementContent() {
     }
   };
 
-  const filterOrders = () => {
-    if (activeTab === 'all') {
-      setFilteredOrders(orders);
+  // Filter orders by date period
+  const ordersInPeriod = useMemo(() => {
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date = now;
+
+    if (periodFilter === 'custom') {
+      if (!customStartDate || !customEndDate) return orders;
+      startDate = new Date(customStartDate);
+      endDate = new Date(customEndDate);
+      endDate.setHours(23, 59, 59, 999);
     } else {
-      setFilteredOrders(orders.filter((o) => o.status === activeTab));
+      const days = parseInt(periodFilter, 10);
+      startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - days);
+      startDate.setHours(0, 0, 0, 0);
     }
-  };
+
+    return orders.filter((order) => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= startDate && orderDate <= endDate;
+    });
+  }, [orders, periodFilter, customStartDate, customEndDate]);
+
+  // Filter by status tab
+  const filteredOrders = useMemo(() => {
+    if (activeTab === 'all') {
+      return ordersInPeriod;
+    }
+    return ordersInPeriod.filter((o) => o.status === activeTab);
+  }, [ordersInPeriod, activeTab]);
 
   const handleUpdateStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
@@ -92,8 +117,18 @@ function OrdersManagementContent() {
   };
 
   const getStatusCount = (status: string) => {
-    if (status === 'all') return orders.length;
-    return orders.filter((o) => o.status === status).length;
+    if (status === 'all') return ordersInPeriod.length;
+    return ordersInPeriod.filter((o) => o.status === status).length;
+  };
+
+  const getPeriodLabel = () => {
+    switch (periodFilter) {
+      case '7': return 'Últimos 7 dias';
+      case '15': return 'Últimos 15 dias';
+      case '30': return 'Últimos 30 dias';
+      case 'custom': return 'Período personalizado';
+      default: return '';
+    }
   };
 
   if (isLoading) {
@@ -107,6 +142,58 @@ function OrdersManagementContent() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Gerenciar Pedidos</h1>
           <p className="text-gray-600">Visualize e gerencie todos os pedidos do seu restaurante</p>
         </div>
+
+        {/* Period Filter */}
+        <Card className="mb-6">
+          <CardContent className="py-4">
+            <div className="flex flex-wrap items-end gap-4">
+              <div>
+                <Label className="text-sm text-gray-600 mb-2 block">Período</Label>
+                <Select value={periodFilter} onValueChange={(v) => setPeriodFilter(v as PeriodFilter)}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Selecione o período" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">Últimos 7 dias</SelectItem>
+                    <SelectItem value="15">Últimos 15 dias</SelectItem>
+                    <SelectItem value="30">Últimos 30 dias</SelectItem>
+                    <SelectItem value="custom">Personalizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {periodFilter === 'custom' && (
+                <>
+                  <div>
+                    <Label className="text-sm text-gray-600 mb-2 block">Data Inicial</Label>
+                    <Input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      className="w-[160px]"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm text-gray-600 mb-2 block">Data Final</Label>
+                    <Input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      className="w-[160px]"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="ml-auto text-right">
+                <p className="text-sm text-gray-500">{getPeriodLabel()}</p>
+                <p className="text-lg font-bold text-orange-600">
+                  {ordersInPeriod.length} pedidos | {formatPrice(ordersInPeriod.reduce((sum, o) => sum + Number(o.totalAmount), 0))}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
@@ -161,7 +248,7 @@ function OrdersManagementContent() {
                             <div>
                               <p className="text-gray-500">Valor Total</p>
                               <p className="font-bold text-orange-600">
-                                {formatPrice(order.totalAmount)}
+                                {formatPrice(Number(order.totalAmount))}
                               </p>
                             </div>
                           </div>

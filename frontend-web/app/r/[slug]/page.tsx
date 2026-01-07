@@ -17,7 +17,7 @@ interface MenuItem {
   id: string;
   name: string;
   description?: string;
-  price: number;
+  price: number | string;
   isAvailable: boolean;
   categoryId: string;
 }
@@ -25,7 +25,18 @@ interface MenuItem {
 interface Category {
   id: string;
   name: string;
-  items: MenuItem[];
+  menuItems: MenuItem[];
+}
+
+interface MenuResponse {
+  restaurant: {
+    id: string;
+    name: string;
+    slug: string;
+    description?: string;
+    logoUrl?: string;
+  };
+  categories: Category[];
 }
 
 interface Restaurant {
@@ -35,7 +46,7 @@ interface Restaurant {
   description?: string;
   address?: string;
   phone?: string;
-  acceptingOrders: boolean;
+  acceptsOrders: boolean;
 }
 
 export default function RestaurantMenuPage() {
@@ -65,9 +76,9 @@ export default function RestaurantMenuPage() {
       setCartRestaurant(restaurantData.id);
 
       // Then fetch menu using the restaurant ID
-      const menuRes = await apiClient.get<{ data: Category[] }>(`/menu/restaurant/${restaurantData.id}/full`);
-      const menuData = Array.isArray(menuRes.data.data) ? menuRes.data.data : [];
-      setCategories(menuData);
+      const menuRes = await apiClient.get<{ data: MenuResponse }>(`/menu/restaurant/${restaurantData.id}/full`);
+      const menuData = menuRes.data.data?.categories;
+      setCategories(Array.isArray(menuData) ? menuData : []);
     } catch (error: unknown) {
       console.error('Error fetching restaurant data:', error);
       const axiosError = error as { response?: { status?: number } };
@@ -142,7 +153,7 @@ export default function RestaurantMenuPage() {
               )}
             </div>
             <div>
-              {restaurant.acceptingOrders ? (
+              {restaurant.acceptsOrders ? (
                 <Badge className="bg-green-600">Aberto</Badge>
               ) : (
                 <Badge variant="secondary">Fechado</Badge>
@@ -169,10 +180,14 @@ export default function RestaurantMenuPage() {
                   <div key={category.id}>
                     <h2 className="text-2xl font-bold text-gray-900 mb-4">{category.name}</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {category.items.map((item) => (
+                      {category.menuItems.map((item) => (
                         <MenuItemCard
                           key={item.id}
-                          {...item}
+                          id={item.id}
+                          name={item.name}
+                          description={item.description}
+                          price={Number(item.price)}
+                          isAvailable={item.isAvailable}
                           category={category.name}
                           onAddToCart={handleAddToCart}
                         />
@@ -246,7 +261,7 @@ export default function RestaurantMenuPage() {
                         <Button
                           className="w-full"
                           onClick={handleCheckout}
-                          disabled={!restaurant.acceptingOrders}
+                          disabled={!restaurant.acceptsOrders}
                         >
                           Finalizar Pedido
                         </Button>

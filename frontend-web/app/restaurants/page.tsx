@@ -16,7 +16,7 @@ interface Restaurant {
   address?: string;
   phone?: string;
   isActive: boolean;
-  acceptingOrders: boolean;
+  acceptsOrders: boolean;
 }
 
 export default function RestaurantsPage() {
