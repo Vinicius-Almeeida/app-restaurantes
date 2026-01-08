@@ -24,17 +24,48 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
+// CORS configuration - supports multiple origins
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  process.env.CORS_ORIGIN,
+].filter(Boolean) as string[];
+
+// Dynamic CORS origin check for Vercel preview deployments
+const corsOriginCheck = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  // Allow requests with no origin (mobile apps, curl, etc.)
+  if (!origin) {
+    callback(null, true);
+    return;
+  }
+
+  // Check if origin is in allowed list
+  if (allowedOrigins.includes(origin)) {
+    callback(null, true);
+    return;
+  }
+
+  // Allow any Vercel preview deployment for this project
+  if (origin.includes('vinicius-almeidas-projects') && origin.includes('vercel.app')) {
+    callback(null, true);
+    return;
+  }
+
+  // Block other origins
+  callback(new Error('Not allowed by CORS'));
+};
+
 // Socket.IO setup
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: corsOriginCheck,
     credentials: true,
   },
 });
 
 // Middleware
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: corsOriginCheck,
   credentials: true,
 }));
 app.use(express.json());

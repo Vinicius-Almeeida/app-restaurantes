@@ -201,6 +201,11 @@ function DashboardContent() {
                   </Link>
                 </Button>
                 <Button variant="outline" className="w-full" asChild>
+                  <Link href="/dashboard/reports">
+                    📊 Relatórios e Analytics
+                  </Link>
+                </Button>
+                <Button variant="outline" className="w-full" asChild>
                   <Link href="/restaurants">
                     👁️ Ver Meu Restaurante
                   </Link>

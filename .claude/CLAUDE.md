@@ -678,9 +678,11 @@ Padrão **AAA**: Arrange → Act → Assert
 
 ## 🔑 CREDENCIAIS DEV
 
-| Role | Email | Senha |
-|------|-------|-------|
-| Super Admin | superadmin@tabsync.com | super123 |
-| Consultant | consultor@tabsync.com | consultor123 |
-| Owner | restaurante@teste.com | teste123 |
-| Customer | cliente@teste.com | teste123 |
+| Role | Email | Senha | URL de Login |
+|------|-------|-------|--------------|
+| Super Admin | admin@tabsync.com | Admin123! | /super-admin |
+| Consultor | maria.consultora@tabsync.com | Consultor123! | /super-admin |
+| Dono Restaurante | dono@botecodochef.com.br | Dono123! | /restaurant/login |
+| Garçom | pedro.garcom@botecodochef.com.br | Staff123! | /restaurant/login |
+| Cozinha | chef.roberto@botecodochef.com.br | Staff123! | /restaurant/login |
+| Cliente | (qualquer email gerado) | Cliente123! | /login |
