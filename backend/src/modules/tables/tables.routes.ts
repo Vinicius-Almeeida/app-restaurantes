@@ -13,7 +13,19 @@ import { asyncHandler } from '../../utils/asyncHandler';
 const router = Router();
 const controller = new TablesController();
 
-// All routes require authentication
+// ========================================
+// PUBLIC ROUTES (no auth required)
+// ========================================
+
+// List public tables for customers (shows availability only)
+router.get(
+  '/public/restaurant/:restaurantId',
+  asyncHandler(controller.listPublicTables.bind(controller))
+);
+
+// ========================================
+// PROTECTED ROUTES (auth required)
+// ========================================
 router.use(authenticate);
 
 // Create table (restaurant owner only)

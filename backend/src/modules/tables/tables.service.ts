@@ -311,4 +311,51 @@ export class TablesService {
 
     return tables;
   }
+
+  /**
+   * Listar mesas públicas para clientes
+   * Mostra apenas informações básicas: número, capacidade, se está ocupada
+   */
+  async listPublicTables(restaurantId: string) {
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+    });
+
+    if (!restaurant) {
+      throw new AppError(404, 'Restaurant not found');
+    }
+
+    if (!restaurant.isActive) {
+      throw new AppError(400, 'Restaurant is not active');
+    }
+
+    const tables = await prisma.table.findMany({
+      where: {
+        restaurantId,
+        isActive: true,
+      },
+      include: {
+        tableSessions: {
+          where: { status: 'ACTIVE' },
+          select: {
+            id: true,
+            _count: {
+              select: { members: true },
+            },
+          },
+        },
+      },
+      orderBy: { number: 'asc' },
+    });
+
+    // Retorna apenas informações públicas
+    return tables.map((table) => ({
+      id: table.id,
+      number: table.number,
+      capacity: table.capacity,
+      qrCode: table.qrCode,
+      isOccupied: table.tableSessions.length > 0,
+      currentOccupancy: table.tableSessions[0]?._count?.members || 0,
+    }));
+  }
 }

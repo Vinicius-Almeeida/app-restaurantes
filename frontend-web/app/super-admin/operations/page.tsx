@@ -469,7 +469,7 @@ function OperationsPageContent() {
 
 export default function OperationsPage() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
+    <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CONSULTANT']}>
       <OperationsPageContent />
     </ProtectedRoute>
   );

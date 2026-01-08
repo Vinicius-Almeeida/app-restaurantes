@@ -552,7 +552,7 @@ function PlansPageContent() {
 
 export default function PlansPage() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
+    <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
       <PlansPageContent />
     </ProtectedRoute>
   );

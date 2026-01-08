@@ -450,7 +450,7 @@ function SuperAdminDashboardContent() {
 
 export default function SuperAdminDashboardPage() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
+    <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CONSULTANT']}>
       <SuperAdminDashboardContent />
     </ProtectedRoute>
   );

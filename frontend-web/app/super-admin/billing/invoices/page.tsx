@@ -554,7 +554,7 @@ function InvoicesPageContent() {
 
 export default function InvoicesPage() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
+    <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CONSULTANT']}>
       <InvoicesPageContent />
     </ProtectedRoute>
   );

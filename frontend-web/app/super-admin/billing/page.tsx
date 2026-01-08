@@ -222,7 +222,7 @@ function BillingPageContent() {
 
 export default function BillingPage() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
+    <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CONSULTANT']}>
       <BillingPageContent />
     </ProtectedRoute>
   );

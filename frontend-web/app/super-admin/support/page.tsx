@@ -219,7 +219,7 @@ function SupportPageContent() {
 
 export default function SupportPage() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
+    <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CONSULTANT']}>
       <SupportPageContent />
     </ProtectedRoute>
   );

@@ -322,7 +322,7 @@ function RestaurantDetailsContent() {
 
 export default function RestaurantDetailsPage() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
+    <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CONSULTANT']}>
       <RestaurantDetailsContent />
     </ProtectedRoute>
   );

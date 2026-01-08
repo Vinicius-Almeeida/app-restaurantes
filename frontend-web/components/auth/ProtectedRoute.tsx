@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type { UserRole } from '@/lib/types';
 
@@ -11,13 +11,34 @@ interface ProtectedRouteProps {
   redirectTo?: string;
 }
 
+/**
+ * Determina a página de login correta baseada no contexto da rota
+ */
+function getLoginRedirectForPath(pathname: string): string {
+  if (pathname.startsWith('/super-admin')) {
+    return '/super-admin/login';
+  }
+  if (
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/waiter') ||
+    pathname.startsWith('/kitchen')
+  ) {
+    return '/restaurant/login';
+  }
+  return '/login';
+}
+
 export function ProtectedRoute({
   children,
   allowedRoles,
-  redirectTo = '/login',
+  redirectTo,
 }: ProtectedRouteProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, isAuthenticated, isLoading, checkAuth } = useAuthStore();
+
+  // Determina o redirect baseado no contexto se não foi especificado
+  const effectiveRedirectTo = redirectTo || getLoginRedirectForPath(pathname);
 
   useEffect(() => {
     checkAuth();
@@ -26,15 +47,15 @@ export function ProtectedRoute({
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
-        router.push(redirectTo);
+        router.push(effectiveRedirectTo);
         return;
       }
 
-      if (allowedRoles && user && !allowedRoles.includes(user.role as any)) {
+      if (allowedRoles && user && !allowedRoles.includes(user.role)) {
         router.push('/unauthorized');
       }
     }
-  }, [isAuthenticated, isLoading, user, allowedRoles, router, redirectTo]);
+  }, [isAuthenticated, isLoading, user, allowedRoles, router, effectiveRedirectTo]);
 
   if (isLoading) {
     return (

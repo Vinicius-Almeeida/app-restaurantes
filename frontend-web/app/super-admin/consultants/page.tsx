@@ -189,7 +189,7 @@ function ConsultantsPageContent() {
 
 export default function ConsultantsPage() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
+    <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
       <ConsultantsPageContent />
     </ProtectedRoute>
   );

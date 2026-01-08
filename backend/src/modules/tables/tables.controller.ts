@@ -79,4 +79,13 @@ export class TablesController {
     const session = await tablesService.closeSession(sessionId, userId);
     res.json({ success: true, data: session });
   }
+
+  /**
+   * Listar mesas públicas para clientes (endpoint público)
+   */
+  async listPublicTables(req: Request, res: Response) {
+    const { restaurantId } = req.params;
+    const tables = await tablesService.listPublicTables(restaurantId);
+    res.json({ success: true, data: tables });
+  }
 }

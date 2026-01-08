@@ -510,7 +510,7 @@ function OnboardingPageContent() {
 
 export default function OnboardingPage() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN', 'CONSULTANT']}>
+    <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CONSULTANT']}>
       <OnboardingPageContent />
     </ProtectedRoute>
   );

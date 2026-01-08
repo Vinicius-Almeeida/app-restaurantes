@@ -549,7 +549,7 @@ function SubscriptionsPageContent() {
 
 export default function SubscriptionsPage() {
   return (
-    <ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
+    <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'CONSULTANT']}>
       <SubscriptionsPageContent />
     </ProtectedRoute>
   );
