@@ -216,63 +216,55 @@ function ConsultantDashboardContent() {
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-slate-800 border-slate-700">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/10 rounded-lg">
-                <Store className="h-5 w-5 text-blue-400" />
+            <div className="flex flex-col items-center text-center">
+              <div className="p-3 bg-blue-500/10 rounded-lg mb-3">
+                <Store className="h-6 w-6 text-blue-400" />
               </div>
-              <div>
-                <p className="text-sm text-slate-400">Restaurantes</p>
-                <p className="text-2xl font-bold text-white">{metrics?.totalRestaurants || 0}</p>
-                <p className="text-xs text-green-400">{metrics?.activeRestaurants || 0} ativos</p>
-              </div>
+              <p className="text-sm text-slate-400">Restaurantes</p>
+              <p className="text-2xl font-bold text-white">{metrics?.totalRestaurants || 0}</p>
+              <p className="text-xs text-green-400">{metrics?.activeRestaurants || 0} ativos</p>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-slate-800 border-slate-700">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-500/10 rounded-lg">
-                <DollarSign className="h-5 w-5 text-green-400" />
+            <div className="flex flex-col items-center text-center">
+              <div className="p-3 bg-green-500/10 rounded-lg mb-3">
+                <DollarSign className="h-6 w-6 text-green-400" />
               </div>
-              <div>
-                <p className="text-sm text-slate-400">Faturamento Total</p>
-                <p className="text-2xl font-bold text-white">{formatPrice(metrics?.totalRevenue || 0)}</p>
-                <p className="text-xs text-slate-500">dos seus restaurantes</p>
-              </div>
+              <p className="text-sm text-slate-400">Faturamento</p>
+              <p className="text-xl font-bold text-white truncate w-full">{formatPrice(metrics?.totalRevenue || 0)}</p>
+              <p className="text-xs text-slate-500">dos restaurantes</p>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-slate-800 border-slate-700">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-500/10 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-orange-400" />
+            <div className="flex flex-col items-center text-center">
+              <div className="p-3 bg-orange-500/10 rounded-lg mb-3">
+                <TrendingUp className="h-6 w-6 text-orange-400" />
               </div>
-              <div>
-                <p className="text-sm text-slate-400">Comissao Estimada</p>
-                <p className="text-2xl font-bold text-white">{formatPrice(metrics?.estimatedCommission || 0)}</p>
-                <p className="text-xs text-slate-500">{metrics?.commissionPercent || 0}% do faturamento</p>
-              </div>
+              <p className="text-sm text-slate-400">Comissao</p>
+              <p className="text-xl font-bold text-white truncate w-full">{formatPrice(metrics?.estimatedCommission || 0)}</p>
+              <p className="text-xs text-slate-500">{metrics?.commissionPercent || 0}%</p>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-slate-800 border-slate-700">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-500/10 rounded-lg">
-                <Award className="h-5 w-5 text-purple-400" />
+            <div className="flex flex-col items-center text-center">
+              <div className="p-3 bg-purple-500/10 rounded-lg mb-3">
+                <Award className="h-6 w-6 text-purple-400" />
               </div>
-              <div>
-                <p className="text-sm text-slate-400">Ganhos Acumulados</p>
-                <p className="text-2xl font-bold text-white">{formatPrice(metrics?.totalEarnings || 0)}</p>
-                <p className="text-xs text-slate-500">{metrics?.totalOnboardings || 0} onboardings</p>
-              </div>
+              <p className="text-sm text-slate-400">Ganhos</p>
+              <p className="text-xl font-bold text-white truncate w-full">{formatPrice(metrics?.totalEarnings || 0)}</p>
+              <p className="text-xs text-slate-500">{metrics?.totalOnboardings || 0} onboardings</p>
             </div>
           </CardContent>
         </Card>
