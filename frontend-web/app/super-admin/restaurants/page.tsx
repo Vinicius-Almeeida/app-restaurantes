@@ -3,6 +3,7 @@
 /**
  * Super Admin - Restaurants List Page
  * FAANG-level enterprise page for managing all restaurants on the platform.
+ * Supports both SUPER_ADMIN (full access) and CONSULTANT (own restaurants only).
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -16,6 +17,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +36,7 @@ import {
   type ListRestaurantsParams,
   type Plan,
 } from '@/lib/api/admin';
+import { consultantApi, type ConsultantRestaurant } from '@/lib/api/consultant';
 
 const STATUS_COLORS = {
   ACTIVE: 'bg-green-100 text-green-800 border-green-200',
@@ -49,7 +52,10 @@ const STATUS_LABELS = {
 
 function RestaurantsListContent() {
   const router = useRouter();
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const { user } = useAuthStore();
+  const isConsultant = user?.role === 'CONSULTANT';
+
+  const [restaurants, setRestaurants] = useState<(Restaurant | ConsultantRestaurant)[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [totalPages, setTotalPages] = useState(0);
@@ -71,28 +77,54 @@ function RestaurantsListContent() {
         setIsRefreshing(true);
       }
 
-      const cleanFilters: ListRestaurantsParams = {
-        page: filters.page,
-        limit: filters.limit,
-      };
+      if (isConsultant) {
+        // Consultant: fetch only their onboarded restaurants
+        const restaurantsList = await consultantApi.getMyRestaurants();
+        let filtered = Array.isArray(restaurantsList) ? restaurantsList : [];
 
-      if (filters.status) {
-        cleanFilters.status = filters.status;
+        // Apply client-side filtering for consultant
+        if (filters.search && filters.search.trim().length > 0) {
+          const searchLower = filters.search.trim().toLowerCase();
+          filtered = filtered.filter((r) =>
+            r.name.toLowerCase().includes(searchLower) ||
+            r.slug.toLowerCase().includes(searchLower)
+          );
+        }
+
+        if (filters.status === 'active') {
+          filtered = filtered.filter((r) => r.isActive);
+        } else if (filters.status === 'inactive') {
+          filtered = filtered.filter((r) => !r.isActive);
+        }
+
+        setRestaurants(filtered);
+        setTotalPages(1);
+        setTotalCount(filtered.length);
+      } else {
+        // Admin: use full admin API with server-side filtering
+        const cleanFilters: ListRestaurantsParams = {
+          page: filters.page,
+          limit: filters.limit,
+        };
+
+        if (filters.status) {
+          cleanFilters.status = filters.status;
+        }
+
+        if (filters.planId) {
+          cleanFilters.planId = filters.planId;
+        }
+
+        if (filters.search && filters.search.trim().length > 0) {
+          cleanFilters.search = filters.search.trim();
+        }
+
+        const response = await adminApi.listRestaurants(cleanFilters);
+
+        setRestaurants(Array.isArray(response.restaurants) ? response.restaurants : []);
+        setTotalPages(response.pages);
+        setTotalCount(response.total);
       }
-
-      if (filters.planId) {
-        cleanFilters.planId = filters.planId;
-      }
-
-      if (filters.search && filters.search.trim().length > 0) {
-        cleanFilters.search = filters.search.trim();
-      }
-
-      const response = await adminApi.listRestaurants(cleanFilters);
-
-      setRestaurants(Array.isArray(response.restaurants) ? response.restaurants : []);
-      setTotalPages(response.pages);
-      setTotalCount(response.total);
 
       if (showToast) {
         toast.success('Lista atualizada');
@@ -104,16 +136,19 @@ function RestaurantsListContent() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [filters]);
+  }, [filters, isConsultant]);
 
   const fetchPlans = useCallback(async () => {
+    // Only admins can see plans filter
+    if (isConsultant) return;
+
     try {
       const plansData = await adminApi.listPlans();
       setPlans(Array.isArray(plansData) ? plansData.filter((plan) => plan.isActive) : []);
     } catch (error) {
       console.error('Error fetching plans:', error);
     }
-  }, []);
+  }, [isConsultant]);
 
   useEffect(() => {
     fetchPlans();
@@ -197,10 +232,12 @@ function RestaurantsListContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Restaurantes
+            {isConsultant ? 'Meus Restaurantes' : 'Restaurantes'}
           </h1>
           <p className="text-gray-600">
-            Gerencie todos os restaurantes da plataforma
+            {isConsultant
+              ? 'Restaurantes que voce fez onboarding'
+              : 'Gerencie todos os restaurantes da plataforma'}
           </p>
         </div>
         <Button
@@ -224,7 +261,7 @@ function RestaurantsListContent() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className={`grid grid-cols-1 gap-4 ${isConsultant ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -252,23 +289,25 @@ function RestaurantsListContent() {
               </SelectContent>
             </Select>
 
-            {/* Plan Filter */}
-            <Select
-              value={filters.planId || 'all'}
-              onValueChange={handlePlanFilter}
-            >
-              <SelectTrigger aria-label="Filtrar por plano">
-                <SelectValue placeholder="Todos os planos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os planos</SelectItem>
-                {plans.map((plan) => (
-                  <SelectItem key={plan.id} value={plan.id}>
-                    {plan.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Plan Filter - Only for Admin */}
+            {!isConsultant && (
+              <Select
+                value={filters.planId || 'all'}
+                onValueChange={handlePlanFilter}
+              >
+                <SelectTrigger aria-label="Filtrar por plano">
+                  <SelectValue placeholder="Todos os planos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os planos</SelectItem>
+                  {plans.map((plan) => (
+                    <SelectItem key={plan.id} value={plan.id}>
+                      {plan.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -310,9 +349,11 @@ function RestaurantsListContent() {
                       <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">
                         Proprietario
                       </th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">
-                        Plano
-                      </th>
+                      {!isConsultant && (
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">
+                          Plano
+                        </th>
+                      )}
                       <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">
                         Status
                       </th>
@@ -325,66 +366,71 @@ function RestaurantsListContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {restaurants.map((restaurant) => (
-                      <tr
-                        key={restaurant.id}
-                        onClick={() => handleRowClick(restaurant.id)}
-                        className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            handleRowClick(restaurant.id);
-                          }
-                        }}
-                        aria-label={`Ver detalhes de ${restaurant.name}`}
-                      >
-                        <td className="py-4 px-4">
-                          <div>
-                            <p className="font-medium text-gray-900">
-                              {restaurant.name}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              /{restaurant.slug}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div>
-                            <p className="text-gray-900">
-                              {restaurant.owner.fullName}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {restaurant.owner.email}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          {restaurant.subscription?.plan ? (
-                            <span className="text-gray-900 font-medium">
-                              {restaurant.subscription.plan.name}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 text-sm">
-                              Sem plano
-                            </span>
+                    {restaurants.map((restaurant) => {
+                      const adminRestaurant = restaurant as Restaurant;
+                      return (
+                        <tr
+                          key={restaurant.id}
+                          onClick={() => handleRowClick(restaurant.id)}
+                          className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              handleRowClick(restaurant.id);
+                            }
+                          }}
+                          aria-label={`Ver detalhes de ${restaurant.name}`}
+                        >
+                          <td className="py-4 px-4">
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {restaurant.name}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                /{restaurant.slug}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4">
+                            <div>
+                              <p className="text-gray-900">
+                                {restaurant.owner.fullName}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {restaurant.owner.email}
+                              </p>
+                            </div>
+                          </td>
+                          {!isConsultant && (
+                            <td className="py-4 px-4">
+                              {adminRestaurant.subscription?.plan ? (
+                                <span className="text-gray-900 font-medium">
+                                  {adminRestaurant.subscription.plan.name}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-sm">
+                                  Sem plano
+                                </span>
+                              )}
+                            </td>
                           )}
-                        </td>
-                        <td className="py-4 px-4">
-                          {getStatusBadge(restaurant.isActive)}
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="text-gray-900">
-                            {restaurant._count.orders}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="text-gray-600">
-                            {formatDate(restaurant.createdAt)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                          <td className="py-4 px-4">
+                            {getStatusBadge(restaurant.isActive)}
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className="text-gray-900">
+                              {restaurant._count.orders}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className="text-gray-600">
+                              {formatDate(restaurant.createdAt)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

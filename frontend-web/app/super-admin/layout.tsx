@@ -13,7 +13,8 @@ import {
   Shield,
   LogOut,
   Menu,
-  X
+  X,
+  PlusCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -69,14 +70,24 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
     return null;
   }
 
-  const navigationItems = [
+  // Different navigation based on role
+  const adminNavigationItems = [
     { href: '/super-admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/super-admin/users', label: 'Usuários', icon: Users },
+    { href: '/super-admin/users', label: 'Usuarios', icon: Users },
     { href: '/super-admin/restaurants', label: 'Restaurantes', icon: Store },
     { href: '/super-admin/analytics', label: 'Analytics', icon: BarChart3 },
-    { href: '/super-admin/security', label: 'Segurança', icon: Shield },
-    { href: '/super-admin/settings', label: 'Configurações', icon: Settings },
+    { href: '/super-admin/security', label: 'Seguranca', icon: Shield },
+    { href: '/super-admin/settings', label: 'Configuracoes', icon: Settings },
   ];
+
+  const consultantNavigationItems = [
+    { href: '/super-admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/super-admin/restaurants', label: 'Meus Restaurantes', icon: Store },
+    { href: '/super-admin/onboarding', label: 'Novo Restaurante', icon: PlusCircle },
+    { href: '/super-admin/performance', label: 'Performance', icon: BarChart3 },
+  ];
+
+  const navigationItems = user?.role === 'CONSULTANT' ? consultantNavigationItems : adminNavigationItems;
 
   return (
     <div className="min-h-screen bg-slate-900">
@@ -97,8 +108,12 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
                 <Shield className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-white">TabSync Admin</h1>
-                <p className="text-xs text-slate-400">Painel de Administração</p>
+                <h1 className="text-lg font-bold text-white">
+                  {user?.role === 'CONSULTANT' ? 'TabSync Consultor' : 'TabSync Admin'}
+                </h1>
+                <p className="text-xs text-slate-400">
+                  {user?.role === 'CONSULTANT' ? 'Painel do Consultor' : 'Painel de Administracao'}
+                </p>
               </div>
             </div>
           </div>
