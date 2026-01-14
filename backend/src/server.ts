@@ -29,6 +29,7 @@ const httpServer = createServer(app);
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
+  'https://app-restaurantes.vercel.app',
   process.env.CORS_ORIGIN,
 ].filter(Boolean) as string[];
 

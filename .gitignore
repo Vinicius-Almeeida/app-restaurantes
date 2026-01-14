@@ -24,5 +24,8 @@ node_modules/
 # Windows special file
 nul
 
+# Claude Code temporary files
+tmpclaude-*
+
 # Prototype folder (separate repo)
 prototipo-app-restaurantes/
