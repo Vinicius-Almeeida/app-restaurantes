@@ -49,7 +49,9 @@ export class AdminService {
   }
 
   async listRestaurants(filters: ListRestaurantsInput) {
-    const { page = 1, limit = 20, status, planId, search } = filters;
+    const page = Number(filters.page) || 1;
+    const limit = Number(filters.limit) || 20;
+    const { status, planId, search } = filters;
     const skip = (page - 1) * limit;
     const where: Record<string, unknown> = {};
 
@@ -96,7 +98,9 @@ export class AdminService {
   }
 
   async listUsers(filters: ListUsersInput) {
-    const { page = 1, limit = 20, role, search } = filters;
+    const page = Number(filters.page) || 1;
+    const limit = Number(filters.limit) || 20;
+    const { role, search } = filters;
     const skip = (page - 1) * limit;
     const where: Record<string, unknown> = {};
 
@@ -141,7 +145,9 @@ export class AdminService {
   }
 
   async listSubscriptions(filters: ListSubscriptionsInput) {
-    const { page = 1, limit = 20, status, planId } = filters;
+    const page = Number(filters.page) || 1;
+    const limit = Number(filters.limit) || 20;
+    const { status, planId } = filters;
     const skip = (page - 1) * limit;
     const where: Record<string, unknown> = {};
 
