@@ -37,7 +37,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
     if (!isLoading && pathname !== '/super-admin/login') {
       if (!user) {
         router.push('/super-admin/login');
-      } else if (user.role !== 'ADMIN' && user.role !== 'CONSULTANT') {
+      } else if (user.role !== 'SUPER_ADMIN' && user.role !== 'CONSULTANT') {
         router.push('/login');
       }
     }
@@ -66,7 +66,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   }
 
   // Don't render if not authenticated or wrong role
-  if (!user || (user.role !== 'ADMIN' && user.role !== 'CONSULTANT')) {
+  if (!user || (user.role !== 'SUPER_ADMIN' && user.role !== 'CONSULTANT')) {
     return null;
   }
 
