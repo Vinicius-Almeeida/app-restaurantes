@@ -37,6 +37,7 @@ export interface ConsultantRestaurant {
     id: string;
     fullName: string;
     email: string;
+    phone?: string | null;
   };
   _count: {
     orders: number;
@@ -51,6 +52,16 @@ export interface ConsultantRestaurantDetails extends ConsultantRestaurant {
   phone: string | null;
   email: string | null;
   logoUrl: string | null;
+  subscription?: {
+    plan: {
+      id: string;
+      name: string;
+      price: number;
+      maxTables: number;
+      maxMenuItems: number;
+      maxStaff: number;
+    };
+  } | null;
   _count: {
     orders: number;
     menuItems: number;
@@ -59,7 +70,9 @@ export interface ConsultantRestaurantDetails extends ConsultantRestaurant {
     tables: number;
   };
   totalRevenue: number;
-  nps: number | null;
+  monthlyRevenue: number;
+  avgRating: number;
+  onboardedAt: string;
 }
 
 export interface ConsultantPerformance {

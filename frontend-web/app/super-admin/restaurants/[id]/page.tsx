@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { adminApi, type RestaurantDetails } from '@/lib/api/admin';
+import { consultantApi, type ConsultantRestaurantDetails } from '@/lib/api/consultant';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,12 +27,17 @@ import {
   XCircle,
 } from 'lucide-react';
 
+// Union type to handle both admin and consultant restaurant details
+type RestaurantData = RestaurantDetails | ConsultantRestaurantDetails;
+
 function RestaurantDetailsContent() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuthStore();
   const restaurantId = params.id as string;
+  const isConsultant = user?.role === 'CONSULTANT';
 
-  const [restaurant, setRestaurant] = useState<RestaurantDetails | null>(null);
+  const [restaurant, setRestaurant] = useState<RestaurantData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,8 +45,13 @@ function RestaurantDetailsContent() {
   const fetchRestaurantDetails = async () => {
     try {
       setError(null);
-      const data = await adminApi.getRestaurantDetails(restaurantId);
-      setRestaurant(data);
+      if (isConsultant) {
+        const data = await consultantApi.getRestaurantDetails(restaurantId);
+        setRestaurant(data);
+      } else {
+        const data = await adminApi.getRestaurantDetails(restaurantId);
+        setRestaurant(data);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar detalhes');
     } finally {
@@ -50,7 +62,7 @@ function RestaurantDetailsContent() {
 
   useEffect(() => {
     fetchRestaurantDetails();
-  }, [restaurantId]);
+  }, [restaurantId, isConsultant]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -301,13 +313,23 @@ function RestaurantDetailsContent() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">NPS Score</p>
-                <p className="text-2xl font-bold">
-                  {restaurant.nps !== null ? restaurant.nps.toFixed(1) : 'N/A'}
+                <p className="text-sm text-gray-600">
+                  {isConsultant ? 'Avaliacao Media' : 'NPS Score'}
                 </p>
-                {restaurant.nps !== null && (
+                <p className="text-2xl font-bold">
+                  {isConsultant
+                    ? ((restaurant as ConsultantRestaurantDetails).avgRating?.toFixed(1) || 'N/A')
+                    : ((restaurant as RestaurantDetails).nps !== null ? (restaurant as RestaurantDetails).nps?.toFixed(1) : 'N/A')
+                  }
+                </p>
+                {!isConsultant && (restaurant as RestaurantDetails).nps !== null && (
                   <p className="text-xs text-gray-500 mt-1">
-                    {restaurant.nps >= 75 ? 'Excelente' : restaurant.nps >= 50 ? 'Muito bom' : restaurant.nps >= 0 ? 'Bom' : 'Precisa melhorar'}
+                    {(restaurant as RestaurantDetails).nps! >= 75 ? 'Excelente' : (restaurant as RestaurantDetails).nps! >= 50 ? 'Muito bom' : (restaurant as RestaurantDetails).nps! >= 0 ? 'Bom' : 'Precisa melhorar'}
+                  </p>
+                )}
+                {isConsultant && (restaurant as ConsultantRestaurantDetails).avgRating > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {(restaurant as ConsultantRestaurantDetails).avgRating >= 4.5 ? 'Excelente' : (restaurant as ConsultantRestaurantDetails).avgRating >= 4 ? 'Muito bom' : (restaurant as ConsultantRestaurantDetails).avgRating >= 3 ? 'Bom' : 'Precisa melhorar'}
                   </p>
                 )}
               </div>
