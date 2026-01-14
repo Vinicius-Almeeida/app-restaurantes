@@ -80,6 +80,12 @@ export function Header() {
                 Dashboard
               </Link>
               <Link
+                href="/dashboard/tables"
+                className="text-sm font-medium text-gray-700 hover:text-orange-600 transition-colors"
+              >
+                Mesas
+              </Link>
+              <Link
                 href="/dashboard/orders"
                 className="text-sm font-medium text-gray-700 hover:text-orange-600 transition-colors"
               >
