@@ -2,6 +2,15 @@ import prisma from '../../config/database';
 import { AppError } from '../../middlewares/errorHandler';
 import { generateOrderNumber } from '../../utils/orderNumber';
 import type { CreateOrderInput, AddItemToOrderInput, UpdateOrderStatusInput, AddParticipantInput } from './orders.schema';
+import {
+  emitNewOrder,
+  emitOrderStatusChanged,
+  emitOrderItemAdded,
+  emitKitchenOrderReceived,
+  emitKitchenOrderStarted,
+  emitKitchenOrderReady,
+  isSocketInitialized,
+} from '../../socket';
 
 export class OrdersService {
   async create(userId: string, data: CreateOrderInput) {
@@ -127,6 +136,28 @@ export class OrdersService {
         },
       },
     });
+
+    // Emit real-time events
+    if (isSocketInitialized()) {
+      const orderForSocket = {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        restaurantId: order.restaurantId,
+        tableNumber: order.tableNumber,
+        status: order.status,
+        totalAmount: Number(order.totalAmount),
+        items: order.orderItems.map((item) => ({
+          id: item.id,
+          name: item.menuItem.name,
+          quantity: item.quantity,
+          unitPrice: Number(item.unitPrice),
+        })),
+        createdAt: order.createdAt.toISOString(),
+      };
+
+      emitNewOrder(order.restaurantId, orderForSocket);
+      emitKitchenOrderReceived(order.restaurantId, orderForSocket);
+    }
 
     return order;
   }
@@ -316,6 +347,22 @@ export class OrdersService {
       },
     });
 
+    // Emit real-time event for item added
+    if (isSocketInitialized()) {
+      emitOrderItemAdded(order.restaurantId, {
+        orderId,
+        orderNumber: order.orderNumber,
+        item: {
+          id: orderItem.id,
+          name: orderItem.menuItem.name,
+          quantity: orderItem.quantity,
+          unitPrice: Number(orderItem.unitPrice),
+          userId,
+        },
+        newTotal: newTotal,
+      });
+    }
+
     return orderItem;
   }
 
@@ -369,6 +416,36 @@ export class OrdersService {
         },
       },
     });
+
+    // Emit real-time events for status change
+    if (isSocketInitialized()) {
+      const statusPayload = {
+        orderId,
+        orderNumber: updatedOrder.orderNumber,
+        previousStatus: order.status,
+        newStatus: data.status,
+        tableNumber: updatedOrder.tableNumber,
+        updatedAt: new Date().toISOString(),
+      };
+
+      emitOrderStatusChanged(updatedOrder.restaurant.id, statusPayload);
+
+      // Emit kitchen-specific events based on status
+      if (data.status === 'PREPARING') {
+        emitKitchenOrderStarted(updatedOrder.restaurant.id, {
+          orderId,
+          orderNumber: updatedOrder.orderNumber,
+          startedAt: new Date().toISOString(),
+        });
+      } else if (data.status === 'READY') {
+        emitKitchenOrderReady(updatedOrder.restaurant.id, {
+          orderId,
+          orderNumber: updatedOrder.orderNumber,
+          tableNumber: updatedOrder.tableNumber,
+          readyAt: new Date().toISOString(),
+        });
+      }
+    }
 
     return updatedOrder;
   }

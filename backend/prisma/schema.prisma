@@ -53,6 +53,7 @@ model User {
   consultant           Consultant?
   auditLogs            AuditLog[]
   waiterCallsHandled   WaiterCall[]         @relation("WaiterCalls")
+  splitPreference      UserSplitPreference?
 
   @@index([email])
   @@index([role])
@@ -1016,6 +1017,114 @@ model StockEntryItem {
   @@index([stockEntryId])
   @@index([inventoryItemId])
   @@map("stock_entry_items")
+}
+
+// ============================================
+// SMART SPLIT - User Split Preferences & Analytics
+// ============================================
+
+// User split preferences (what they prefer for splitting)
+model UserSplitPreference {
+  id                    String      @id @default(uuid())
+  userId                String      @unique @map("user_id")
+  preferredSplitMethod  SplitMethod @default(EQUAL) @map("preferred_split_method")
+  autoSuggestEnabled    Boolean     @default(true) @map("auto_suggest_enabled")
+  learnFromHistory      Boolean     @default(true) @map("learn_from_history")
+  preferredPaymentMethod PaymentMethod? @map("preferred_payment_method")
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_split_preferences")
+}
+
+// Analytics per user-restaurant combination (tracks behavior patterns)
+model CustomerSplitAnalytics {
+  id                    String      @id @default(uuid())
+  userId                String      @map("user_id")
+  restaurantId          String?     @map("restaurant_id") // null = global stats
+
+  // Split counts per method
+  totalSplits           Int         @default(0) @map("total_splits")
+  equalSplitCount       Int         @default(0) @map("equal_split_count")
+  byItemSplitCount      Int         @default(0) @map("by_item_split_count")
+  customSplitCount      Int         @default(0) @map("custom_split_count")
+  percentageSplitCount  Int         @default(0) @map("percentage_split_count")
+
+  // Derived stats
+  lastSplitMethod       SplitMethod? @map("last_split_method")
+  avgParticipants       Decimal     @default(0) @db.Decimal(4, 2) @map("avg_participants")
+  avgSplitAmount        Decimal     @default(0) @db.Decimal(10, 2) @map("avg_split_amount")
+
+  // Frequent co-splitters (JSON array of userIds)
+  frequentCoSplitters   Json?       @map("frequent_co_splitters")
+
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
+
+  @@unique([userId, restaurantId])
+  @@index([userId])
+  @@index([restaurantId])
+  @@map("customer_split_analytics")
+}
+
+// History of split decisions (for ML learning & feedback loop)
+model SplitDecisionHistory {
+  id                    String      @id @default(uuid())
+  userId                String      @map("user_id")
+  orderId               String      @map("order_id")
+  restaurantId          String      @map("restaurant_id")
+
+  // What SmartSplit recommended vs what user chose
+  suggestedMethod       SplitMethod @map("suggested_method")
+  chosenMethod          SplitMethod @map("chosen_method")
+  suggestionConfidence  Decimal     @db.Decimal(5, 2) @map("suggestion_confidence") // 0-100
+  suggestionAccepted    Boolean     @map("suggestion_accepted")
+
+  // Context for ML
+  participantCount      Int         @map("participant_count")
+  totalAmount           Decimal     @db.Decimal(10, 2) @map("total_amount")
+  hasSharedItems        Boolean     @default(false) @map("has_shared_items")
+
+  // Optional user feedback
+  userRating            Int?        @map("user_rating") // 1-5 satisfaction
+
+  createdAt             DateTime    @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([restaurantId])
+  @@index([suggestionAccepted])
+  @@index([createdAt(sort: Desc)])
+  @@map("split_decision_history")
+}
+
+// Group patterns (detects frequent splitting groups)
+model SplitGroupPattern {
+  id                    String      @id @default(uuid())
+  creatorUserId         String      @map("creator_user_id")
+  groupName             String?     @map("group_name") // Optional user-defined name like "Friends"
+  memberUserIds         String[]    @map("member_user_ids") // Array of user IDs in this group
+  memberCount           Int         @map("member_count")
+
+  // Pattern stats
+  splitCount            Int         @default(0) @map("split_count")
+  lastUsedAt            DateTime?   @map("last_used_at")
+  commonSplitMethod     SplitMethod @default(EQUAL) @map("common_split_method")
+
+  // Auto-detected vs user-created
+  isAutoDetected        Boolean     @default(true) @map("is_auto_detected")
+
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
+
+  @@index([creatorUserId])
+  @@index([splitCount])
+  @@index([lastUsedAt])
+  @@map("split_group_patterns")
 }
 
 // ============================================

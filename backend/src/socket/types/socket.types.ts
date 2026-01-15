@@ -272,6 +272,9 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
+  // Authentication
+  'authenticate': (data: { userId: string; userRole: string; restaurantId?: string }) => void;
+
   // Connection management
   'join-restaurant': (restaurantId: string) => void;
   'leave-restaurant': (restaurantId: string) => void;

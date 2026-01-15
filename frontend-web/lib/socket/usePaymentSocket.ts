@@ -106,7 +106,7 @@ export function usePaymentSocket(options: UsePaymentSocketOptions = {}) {
 
       if (enableNotifications) {
         toast.info('Divisão de conta criada', {
-          description: `${payload.splits.length} participantes`,
+          description: `${payload.participants.length} participantes`,
           duration: 4000,
         });
       }
@@ -128,7 +128,7 @@ export function usePaymentSocket(options: UsePaymentSocketOptions = {}) {
     const handleSplitUpdated = (payload: SplitUpdatedPayload) => {
       console.log('[PaymentSocket] Split updated:', payload);
 
-      if (enableNotifications && payload.updates.paymentStatus === 'PAID') {
+      if (enableNotifications && payload.paymentStatus === 'PAID') {
         toast.success('Pagamento confirmado', {
           description: 'Sua parte foi paga com sucesso',
           duration: 4000,

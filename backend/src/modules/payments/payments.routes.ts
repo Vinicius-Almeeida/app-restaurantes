@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as paymentsController from './payments.controller';
+import { SmartSplitController } from './smart-split.controller';
 import { validate } from '../../middlewares/validate';
 import { authenticate } from '../../middlewares/auth';
 import {
@@ -8,11 +9,36 @@ import {
   processSplitPaymentSchema,
   createPaymentSchema,
 } from './payments.schema';
+import {
+  getRecommendationSchema,
+  submitFeedbackSchema,
+} from './smart-split.schema';
 
 const router = Router();
+const smartSplitController = new SmartSplitController();
 
 // ============================================
-// SPLIT BILL ROUTES 🔥
+// SMART SPLIT ROUTES - AI Recommendations
+// ============================================
+
+// Get split recommendation for an order
+router.post(
+  '/split/:orderId/recommend',
+  authenticate,
+  validate(getRecommendationSchema),
+  smartSplitController.getRecommendation.bind(smartSplitController)
+);
+
+// Submit feedback for a split decision
+router.post(
+  '/split/:decisionId/feedback',
+  authenticate,
+  validate(submitFeedbackSchema),
+  smartSplitController.submitFeedback.bind(smartSplitController)
+);
+
+// ============================================
+// SPLIT BILL ROUTES
 // ============================================
 
 // Create split bill for an order (authenticated)

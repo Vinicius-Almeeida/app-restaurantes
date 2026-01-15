@@ -48,7 +48,7 @@ export function useTableSocket(options: UseTableSocketOptions = {}) {
   useEffect(() => {
     if (!socket || !state.connected || !sessionId) return;
 
-    const room = getRoomNames.tableSession(sessionId);
+    const room = getRoomNames.session(sessionId);
     joinRoom(room);
 
     return () => {
@@ -146,7 +146,7 @@ export function useTableSocket(options: UseTableSocketOptions = {}) {
 
       if (enableNotifications) {
         toast.info('Membro saiu da mesa', {
-          description: `${payload.userName} saiu da mesa`,
+          description: `${payload.member.userName} saiu da mesa`,
           duration: 3000,
         });
       }

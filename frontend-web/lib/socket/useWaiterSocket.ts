@@ -22,16 +22,17 @@ interface UseWaiterSocketOptions {
   enableSounds?: boolean;
 }
 
-const PRIORITY_LABELS = {
-  LOW: 'Baixa',
-  MEDIUM: 'Média',
-  HIGH: 'Alta',
+const PRIORITY_LABELS: Record<string, string> = {
+  low: 'Baixa',
+  normal: 'Normal',
+  high: 'Alta',
 };
 
-const REASON_LABELS = {
-  CALL_WAITER: 'Chamado do cliente',
-  PAYMENT_READY: 'Pronto para pagar',
-  COMPLAINT: 'Reclamação',
+const REASON_LABELS: Record<string, string> = {
+  order_ready: 'Pedido pronto',
+  payment_request: 'Pronto para pagar',
+  assistance: 'Assistência',
+  complaint: 'Reclamação',
 };
 
 export function useWaiterSocket(options: UseWaiterSocketOptions = {}) {
@@ -49,7 +50,7 @@ export function useWaiterSocket(options: UseWaiterSocketOptions = {}) {
   useEffect(() => {
     if (!socket || !state.connected || !restaurantId) return;
 
-    const room = getRoomNames.waiter(restaurantId);
+    const room = getRoomNames.waiters(restaurantId);
     joinRoom(room);
 
     return () => {
@@ -60,12 +61,12 @@ export function useWaiterSocket(options: UseWaiterSocketOptions = {}) {
   /**
    * Play notification sound
    */
-  const playSound = useCallback((priority: 'LOW' | 'MEDIUM' | 'HIGH') => {
+  const playSound = useCallback((priority: 'low' | 'normal' | 'high') => {
     if (!enableSounds || typeof window === 'undefined') return;
 
     try {
       const soundFile =
-        priority === 'HIGH'
+        priority === 'high'
           ? '/sounds/urgent-call.mp3'
           : '/sounds/waiter-call.mp3';
 
@@ -83,11 +84,11 @@ export function useWaiterSocket(options: UseWaiterSocketOptions = {}) {
     const handleWaiterCalled = (payload: WaiterCalledPayload) => {
       console.log('[WaiterSocket] Waiter called:', payload);
 
-      playSound('MEDIUM');
+      playSound('normal');
 
       if (enableNotifications) {
         toast.info('Chamado de cliente', {
-          description: `Mesa ${payload.tableNumber} - ${payload.customerName}${
+          description: `Mesa ${payload.tableNumber} - ${payload.calledBy.userName}${
             payload.reason ? `: ${payload.reason}` : ''
           }`,
           duration: 10000,
@@ -120,12 +121,12 @@ export function useWaiterSocket(options: UseWaiterSocketOptions = {}) {
       playSound(payload.priority);
 
       if (enableNotifications) {
-        const isUrgent = payload.priority === 'HIGH';
+        const isUrgent = payload.priority === 'high';
 
         toast[isUrgent ? 'error' : 'warning']('Mesa precisa de atenção', {
           description: `Mesa ${payload.tableNumber} - ${
             REASON_LABELS[payload.reason] || payload.reason
-          } (${PRIORITY_LABELS[payload.priority]})`,
+          } (${PRIORITY_LABELS[payload.priority] || payload.priority})`,
           duration: isUrgent ? 0 : 8000, // Persistent for urgent
           action: {
             label: 'Atender',

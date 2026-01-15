@@ -34,5 +34,6 @@ export type {
   KitchenOrderStartedPayload,
   KitchenOrderReadyPayload,
   WaiterCalledPayload,
+  WaiterAssignedPayload,
   TableNeedsAttentionPayload,
 } from './types';

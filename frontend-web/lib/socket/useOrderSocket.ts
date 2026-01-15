@@ -17,7 +17,7 @@ import type {
 
 interface UseOrderSocketOptions {
   restaurantId?: string;
-  orderId?: string;
+  sessionId?: string;
   onNewOrder?: (payload: NewOrderPayload) => void;
   onStatusChanged?: (payload: OrderStatusChangedPayload) => void;
   onItemAdded?: (payload: OrderItemAddedPayload) => void;
@@ -36,7 +36,7 @@ const STATUS_LABELS: Record<string, string> = {
 export function useOrderSocket(options: UseOrderSocketOptions = {}) {
   const {
     restaurantId,
-    orderId,
+    sessionId,
     onNewOrder,
     onStatusChanged,
     onItemAdded,
@@ -57,17 +57,17 @@ export function useOrderSocket(options: UseOrderSocketOptions = {}) {
     };
   }, [socket, state.connected, restaurantId, joinRoom, leaveRoom]);
 
-  // Join order room if orderId is provided
+  // Join session room if sessionId is provided
   useEffect(() => {
-    if (!socket || !state.connected || !orderId) return;
+    if (!socket || !state.connected || !sessionId) return;
 
-    const room = getRoomNames.order(orderId);
+    const room = getRoomNames.session(sessionId);
     joinRoom(room);
 
     return () => {
       leaveRoom(room);
     };
-  }, [socket, state.connected, orderId, joinRoom, leaveRoom]);
+  }, [socket, state.connected, sessionId, joinRoom, leaveRoom]);
 
   // Listen to new order events
   useEffect(() => {
@@ -78,7 +78,7 @@ export function useOrderSocket(options: UseOrderSocketOptions = {}) {
 
       if (enableNotifications) {
         toast.success('Novo pedido recebido', {
-          description: `Pedido #${payload.order.orderNumber}`,
+          description: `Pedido #${payload.orderNumber}`,
           duration: 5000,
         });
       }
@@ -127,7 +127,7 @@ export function useOrderSocket(options: UseOrderSocketOptions = {}) {
 
       if (enableNotifications) {
         toast.info('Item adicionado ao pedido', {
-          description: payload.item.menuItem.name,
+          description: `${payload.item.menuItemName} (${payload.item.quantity}x)`,
           duration: 3000,
         });
       }

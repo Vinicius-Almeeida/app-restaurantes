@@ -1,7 +1,10 @@
 import prisma from '../../config/database';
 import { AppError } from '../../middlewares/errorHandler';
 import { generatePaymentToken, generatePaymentLink } from '../../utils/tokens';
+import { SmartSplitService } from './smart-split.service';
 import type { CreateSplitBillInput, CreatePaymentInput, ProcessSplitPaymentInput } from './payments.schema';
+
+const smartSplitService = new SmartSplitService();
 
 export class PaymentsService {
   // ============================================
@@ -91,6 +94,23 @@ export class PaymentsService {
         splitCount: data.participants.length,
       },
     });
+
+    // Record decision for SmartSplit learning (async, don't block response)
+    const hasSharedItems = order.orderItems.some((item: { isShared: boolean }) => item.isShared);
+    const participantUserIds = data.participants.map(p => p.userId);
+
+    smartSplitService.recordDecision(
+      requestingUserId,
+      orderId,
+      order.restaurantId,
+      data.suggestedMethod || data.splitMethod, // If no suggestion was shown, use chosen
+      data.splitMethod,
+      data.suggestionConfidence || 0,
+      data.participants.length,
+      Number(order.totalAmount),
+      hasSharedItems,
+      participantUserIds
+    ).catch(err => console.error('[SmartSplit] Failed to record decision:', err));
 
     return createdSplitPayments;
   }

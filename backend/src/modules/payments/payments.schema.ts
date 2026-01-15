@@ -18,6 +18,9 @@ export const createSplitBillSchema = z.object({
         amountDue: z.number().positive().optional(), // For CUSTOM method
       })
     ).min(2, 'At least 2 participants required for split payment'),
+    // SmartSplit fields - track AI suggestions for learning
+    suggestedMethod: z.enum(['EQUAL', 'BY_ITEM', 'CUSTOM', 'PERCENTAGE']).optional(),
+    suggestionConfidence: z.number().min(0).max(100).optional(),
   }),
 });
 

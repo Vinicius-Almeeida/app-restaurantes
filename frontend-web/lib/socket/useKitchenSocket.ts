@@ -77,8 +77,8 @@ export function useKitchenSocket(options: UseKitchenSocketOptions = {}) {
 
       if (enableNotifications) {
         toast.success('Novo pedido recebido', {
-          description: `Pedido #${payload.order.orderNumber}${
-            payload.order.tableNumber ? ` - Mesa ${payload.order.tableNumber}` : ''
+          description: `Pedido #${payload.orderNumber}${
+            payload.tableNumber ? ` - Mesa ${payload.tableNumber}` : ''
           }`,
           duration: 8000,
           action: {

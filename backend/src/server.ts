@@ -1,9 +1,9 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { Server as SocketIOServer } from 'socket.io';
 import { createServer } from 'http';
 import { errorHandler } from './middlewares/errorHandler';
+import { initializeSocket, TypedSocketServer } from './socket';
 
 // Routes
 import authRoutes from './modules/auth/auth.routes';
@@ -18,6 +18,7 @@ import adminRoutes from './modules/admin/admin.routes';
 import kitchenRoutes from './modules/kitchen/kitchen.routes';
 import waiterRoutes from './modules/waiter/waiter.routes';
 import consultantRoutes from './modules/consultant/consultant.routes';
+import customersRoutes from './modules/customers/customers.routes';
 
 // Load environment variables
 dotenv.config();
@@ -57,13 +58,8 @@ const corsOriginCheck = (origin: string | undefined, callback: (err: Error | nul
   callback(new Error('Not allowed by CORS'));
 };
 
-// Socket.IO setup
-const io = new SocketIOServer(httpServer, {
-  cors: {
-    origin: corsOriginCheck,
-    credentials: true,
-  },
-});
+// Socket.IO setup with all handlers
+const io: TypedSocketServer = initializeSocket(httpServer, corsOriginCheck);
 
 // Middleware
 app.use(cors({
@@ -111,6 +107,7 @@ app.get('/api', (_req: Request, res: Response) => {
       kitchen: '/api/kitchen',
       waiter: '/api/waiter',
       consultant: '/api/consultant',
+      customers: '/api/customers',
     },
   });
 });
@@ -128,6 +125,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/kitchen', kitchenRoutes);
 app.use('/api/waiter', waiterRoutes);
 app.use('/api/consultant', consultantRoutes);
+app.use('/api/customers', customersRoutes);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {
@@ -139,20 +137,6 @@ app.use((_req: Request, res: Response) => {
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
-
-// Socket.IO connection handling
-io.on('connection', (socket) => {
-  console.log(`Client connected: ${socket.id}`);
-
-  socket.on('disconnect', () => {
-    console.log(`Client disconnected: ${socket.id}`);
-  });
-
-  // TODO: Add socket event handlers for real-time features
-  // - Order status updates
-  // - New order notifications
-  // - Bill split notifications
-});
 
 // Start server
 const PORT = process.env.PORT || 4000;
