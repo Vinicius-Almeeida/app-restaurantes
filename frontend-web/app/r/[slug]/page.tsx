@@ -22,8 +22,16 @@ interface MenuItem {
   name: string;
   description?: string;
   price: number | string;
+  imageUrl?: string;
   isAvailable: boolean;
   categoryId: string;
+  prepTime?: number;
+  servingSize?: string;
+  avgRating?: number;
+  ratingCount?: number;
+  isFeatured?: boolean;
+  isNew?: boolean;
+  tags?: string[];
 }
 
 interface Category {
@@ -300,8 +308,14 @@ export default function RestaurantMenuPage() {
                               name={item.name}
                               description={item.description}
                               price={Number(item.price)}
+                              imageUrl={item.imageUrl}
                               isAvailable={item.isAvailable}
-                              category={category.name}
+                              prepTime={item.prepTime}
+                              avgRating={item.avgRating ? Number(item.avgRating) : undefined}
+                              ratingCount={item.ratingCount}
+                              isFeatured={item.isFeatured}
+                              isNew={item.isNew}
+                              tags={item.tags}
                               onAddToCart={activeTableId ? handleAddToCart : undefined}
                             />
                           ))}

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import * as menuController from './menu.controller';
 import { validate } from '../../middlewares/validate';
-import { authenticate, authorize } from '../../middlewares/auth';
+import { authenticate, authorize, optionalAuth } from '../../middlewares/auth';
 import {
   createCategorySchema,
   updateCategorySchema,
@@ -10,6 +10,8 @@ import {
   updateMenuItemSchema,
   getMenuItemSchema,
   getMenuByRestaurantSchema,
+  getRecommendationsSchema,
+  rateMenuItemSchema,
 } from './menu.schema';
 
 const router = Router();
@@ -44,6 +46,54 @@ router.get('/categories/:id', validate(getCategorySchema), menuController.getCat
 
 // Get single menu item (public)
 router.get('/items/:id', validate(getMenuItemSchema), menuController.getMenuItemById);
+
+// ============================================
+// RECOMMENDATIONS ROUTES (public, optionally authenticated)
+// ============================================
+
+// Get recommendations (mixed types)
+router.get(
+  '/restaurant/:restaurantId/recommendations',
+  optionalAuth,
+  validate(getRecommendationsSchema),
+  menuController.getRecommendations
+);
+
+// Get popular items
+router.get(
+  '/restaurant/:restaurantId/popular',
+  validate(getMenuByRestaurantSchema),
+  menuController.getPopularItems
+);
+
+// Get trending items
+router.get(
+  '/restaurant/:restaurantId/trending',
+  validate(getMenuByRestaurantSchema),
+  menuController.getTrendingItems
+);
+
+// Get featured items (chef's choice)
+router.get(
+  '/restaurant/:restaurantId/featured',
+  validate(getMenuByRestaurantSchema),
+  menuController.getFeaturedItems
+);
+
+// Get new items
+router.get(
+  '/restaurant/:restaurantId/new',
+  validate(getMenuByRestaurantSchema),
+  menuController.getNewItems
+);
+
+// Rate a menu item (authenticated)
+router.post(
+  '/items/:id/rate',
+  authenticate,
+  validate(rateMenuItemSchema),
+  menuController.rateMenuItem
+);
 
 // ============================================
 // PROTECTED ROUTES - Restaurant owners only

@@ -408,6 +408,10 @@ model MenuItem {
   imageUrl       String?  @map("image_url")
   price          Decimal  @db.Decimal(10, 2)
 
+  // Preparation & Kitchen
+  prepTime       Int?     @map("prep_time") // Tempo de preparo em minutos
+  servingSize    String?  @map("serving_size") // Ex: "Serve 2 pessoas"
+
   // Nutritional info
   calories       Int?
   allergens      String[]
@@ -416,8 +420,18 @@ model MenuItem {
   isAvailable    Boolean  @default(true) @map("is_available")
   stockQuantity  Int?     @map("stock_quantity")
 
+  // Popularity & Analytics
+  orderCount     Int      @default(0) @map("order_count") // Total de pedidos
+  avgRating      Decimal? @db.Decimal(3, 2) @map("avg_rating") // Media de avaliacao (0-5)
+  ratingCount    Int      @default(0) @map("rating_count") // Quantidade de avaliacoes
+  isFeatured     Boolean  @default(false) @map("is_featured") // Destaque do chef
+  isNew          Boolean  @default(false) @map("is_new") // Item novo no cardapio
+
   // Customizations
   customizations Json?
+
+  // Tags for recommendations
+  tags           String[] // Ex: ["vegetariano", "picante", "popular"]
 
   displayOrder   Int      @default(0) @map("display_order")
   createdAt      DateTime @default(now()) @map("created_at")

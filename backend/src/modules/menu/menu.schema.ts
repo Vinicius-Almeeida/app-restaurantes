@@ -36,6 +36,10 @@ export const createMenuItemSchema = z.object({
     imageUrl: z.string().url().optional(),
     price: z.number().positive('Price must be a positive number'),
 
+    // Preparation & Kitchen
+    prepTime: z.number().int().positive().optional(), // Tempo em minutos
+    servingSize: z.string().optional(), // Ex: "Serve 2 pessoas"
+
     // Nutritional info
     calories: z.number().int().positive().optional(),
     allergens: z.array(z.string()).optional(),
@@ -45,6 +49,11 @@ export const createMenuItemSchema = z.object({
 
     // Customizations
     customizations: z.record(z.array(z.string())).optional(),
+
+    // Recommendations
+    isFeatured: z.boolean().optional(),
+    isNew: z.boolean().optional(),
+    tags: z.array(z.string()).optional(),
 
     displayOrder: z.number().int().default(0),
   }),
@@ -60,11 +69,27 @@ export const updateMenuItemSchema = z.object({
     description: z.string().optional(),
     imageUrl: z.string().url().optional(),
     price: z.number().positive().optional(),
+
+    // Preparation & Kitchen
+    prepTime: z.number().int().positive().optional(),
+    servingSize: z.string().optional(),
+
+    // Nutritional
     calories: z.number().int().positive().optional(),
     allergens: z.array(z.string()).optional(),
+
+    // Availability
     isAvailable: z.boolean().optional(),
     stockQuantity: z.number().int().nonnegative().optional(),
+
+    // Customizations
     customizations: z.record(z.array(z.string())).optional(),
+
+    // Recommendations
+    isFeatured: z.boolean().optional(),
+    isNew: z.boolean().optional(),
+    tags: z.array(z.string()).optional(),
+
     displayOrder: z.number().int().optional(),
   }),
 });
@@ -87,7 +112,30 @@ export const getMenuByRestaurantSchema = z.object({
   }),
 });
 
+// ============================================
+// RECOMMENDATIONS
+// ============================================
+export const getRecommendationsSchema = z.object({
+  params: z.object({
+    restaurantId: z.string().uuid('Invalid restaurant ID'),
+  }),
+  query: z.object({
+    limit: z.string().transform(Number).pipe(z.number().int().positive().max(20)).optional(),
+    type: z.enum(['popular', 'trending', 'featured', 'new', 'personalized']).optional(),
+  }),
+});
+
+export const rateMenuItemSchema = z.object({
+  params: z.object({
+    id: z.string().uuid('Invalid menu item ID'),
+  }),
+  body: z.object({
+    rating: z.number().int().min(1).max(5),
+  }),
+});
+
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>['body'];
 export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>['body'];
 export type CreateMenuItemInput = z.infer<typeof createMenuItemSchema>['body'];
 export type UpdateMenuItemInput = z.infer<typeof updateMenuItemSchema>['body'];
+export type GetRecommendationsQuery = z.infer<typeof getRecommendationsSchema>['query'];

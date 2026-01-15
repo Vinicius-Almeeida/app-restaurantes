@@ -1,14 +1,17 @@
 import { Request, Response } from 'express';
 import { MenuService } from './menu.service';
+import { MenuRecommendationsService } from './menu-recommendations.service';
 import { asyncHandler } from '../../utils/asyncHandler';
 import type {
   CreateCategoryInput,
   UpdateCategoryInput,
   CreateMenuItemInput,
   UpdateMenuItemInput,
+  GetRecommendationsQuery,
 } from './menu.schema';
 
 const menuService = new MenuService();
+const recommendationsService = new MenuRecommendationsService();
 
 // ============================================
 // MENU CATEGORIES
@@ -183,5 +186,104 @@ export const getFullMenu = asyncHandler(async (req: Request, res: Response) => {
   res.status(200).json({
     message: 'Full menu retrieved successfully',
     data: menu,
+  });
+});
+
+// ============================================
+// RECOMMENDATIONS
+// ============================================
+
+export const getRecommendations = asyncHandler(async (req: Request, res: Response) => {
+  const { restaurantId } = req.params;
+  const { limit, type } = req.query as GetRecommendationsQuery;
+  const userId = req.user?.userId;
+
+  const recommendations = await recommendationsService.getRecommendations({
+    restaurantId,
+    userId,
+    type,
+    limit: limit ?? 6,
+  });
+
+  res.status(200).json({
+    message: 'Recommendations retrieved successfully',
+    data: recommendations,
+  });
+});
+
+export const getPopularItems = asyncHandler(async (req: Request, res: Response) => {
+  const { restaurantId } = req.params;
+  const limit = req.query.limit ? Number(req.query.limit) : undefined;
+
+  const items = await recommendationsService.getPopularItems({
+    restaurantId,
+    limit,
+  });
+
+  res.status(200).json({
+    message: 'Popular items retrieved successfully',
+    data: items,
+  });
+});
+
+export const getTrendingItems = asyncHandler(async (req: Request, res: Response) => {
+  const { restaurantId } = req.params;
+  const limit = req.query.limit ? Number(req.query.limit) : undefined;
+
+  const items = await recommendationsService.getTrendingItems({
+    restaurantId,
+    limit,
+  });
+
+  res.status(200).json({
+    message: 'Trending items retrieved successfully',
+    data: items,
+  });
+});
+
+export const getFeaturedItems = asyncHandler(async (req: Request, res: Response) => {
+  const { restaurantId } = req.params;
+  const limit = req.query.limit ? Number(req.query.limit) : undefined;
+
+  const items = await recommendationsService.getFeaturedItems({
+    restaurantId,
+    limit,
+  });
+
+  res.status(200).json({
+    message: 'Featured items retrieved successfully',
+    data: items,
+  });
+});
+
+export const getNewItems = asyncHandler(async (req: Request, res: Response) => {
+  const { restaurantId } = req.params;
+  const limit = req.query.limit ? Number(req.query.limit) : undefined;
+
+  const items = await recommendationsService.getNewItems({
+    restaurantId,
+    limit,
+  });
+
+  res.status(200).json({
+    message: 'New items retrieved successfully',
+    data: items,
+  });
+});
+
+export const rateMenuItem = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user?.userId;
+  const { rating } = req.body;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const item = await recommendationsService.rateMenuItem(id, userId, rating);
+
+  res.status(200).json({
+    message: 'Rating submitted successfully',
+    data: item,
   });
 });

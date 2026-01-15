@@ -59,6 +59,25 @@ export const authorize = (...allowedRoles: string[]) => {
 // Alias for authorize middleware
 export const requireRole = (allowedRoles: string[]) => authorize(...allowedRoles);
 
+// Optional auth - doesn't require token but attaches user if present
+export const optionalAuth = (req: Request, _res: Response, next: NextFunction) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      if (token) {
+        const payload = verifyAccessToken(token);
+        req.user = payload;
+      }
+    }
+  } catch {
+    // Token invalid or expired - just continue without user
+  }
+
+  next();
+};
+
 // Type for authenticated requests
 export interface AuthRequest extends Request {
   user: JwtPayload;

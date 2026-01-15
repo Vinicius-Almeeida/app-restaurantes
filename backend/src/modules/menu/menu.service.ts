@@ -166,10 +166,15 @@ export class MenuService {
         description: data.description,
         imageUrl: data.imageUrl,
         price: data.price,
+        prepTime: data.prepTime,
+        servingSize: data.servingSize,
         calories: data.calories,
         allergens: data.allergens || [],
         stockQuantity: data.stockQuantity,
         customizations: data.customizations,
+        isFeatured: data.isFeatured,
+        isNew: data.isNew ?? true, // New items are marked as new by default
+        tags: data.tags || [],
         displayOrder: data.displayOrder,
       },
       include: {
