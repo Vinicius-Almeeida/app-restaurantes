@@ -45,24 +45,20 @@ export default function CheckoutPage() {
     setIsLoading(true);
 
     try {
-      // Create order
+      // Create order with items included (backend requires items array)
       const orderData = {
         restaurantId,
-        tableNumber: parseInt(tableNumber),
+        tableNumber: tableNumber, // Backend expects string, not number
         notes: notes || undefined,
+        items: items.map((item) => ({
+          menuItemId: item.id,
+          quantity: item.quantity,
+          notes: '',
+        })),
       };
 
       const orderResponse = await apiClient.post<{ data: { id: string } }>('/orders', orderData);
       const orderId = orderResponse.data.data.id;
-
-      // Add items to order
-      for (const item of items) {
-        await apiClient.post(`/orders/${orderId}/items`, {
-          menuItemId: item.id,
-          quantity: item.quantity,
-          notes: '',
-        });
-      }
 
       toast.success('Pedido criado com sucesso!');
       clearCart();
